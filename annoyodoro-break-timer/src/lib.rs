@@ -62,7 +62,7 @@ pub fn spawn_break_timer(
         layer_settings,
         flags,
         default_font: Font::with_name("sans-serif"),
-        default_text_size: Pixels(config.font.size),
+        default_text_size: Pixels(config.font_size),
         id: None,
         fonts: Vec::default(),
         antialiasing: false,

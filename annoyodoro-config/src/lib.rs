@@ -14,7 +14,7 @@ use tap::Tap;
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub font: FontConfig,
+    pub font_size: f32,
     pub colors: ColorsConfig,
 }
 
@@ -54,12 +54,6 @@ fn get_config_path() -> Result<std::path::PathBuf, color_eyre::eyre::Error> {
     Ok(dirs::config_dir()
         .wrap_err("Cannot get config dir")?
         .tap_mut(|p| p.extend(["annoyodoro", "config.toml"])))
-}
-
-#[derive(Deserialize, Default)]
-pub struct FontConfig {
-    pub size: f32,
-    pub name: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Copy)]
