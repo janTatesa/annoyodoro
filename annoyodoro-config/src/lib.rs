@@ -1,3 +1,5 @@
+pub mod duration;
+
 use color_eyre::{
     eyre::{ContextCompat, Result},
     owo_colors::OwoColorize,
@@ -13,12 +15,21 @@ use std::{fs, str::FromStr};
 use tap::Tap;
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
-    pub font_size: f32,
+    pub font: FontConfig,
     pub colors: ColorsConfig,
 }
 
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct FontConfig {
+    pub size: f32,
+    pub name: String,
+}
+
 const DEFAULT_CONFIG: &str = include_str!("./default_config.toml");
+
 pub fn print_default_config() {
     println!("{DEFAULT_CONFIG}");
 }
@@ -57,6 +68,7 @@ fn get_config_path() -> Result<std::path::PathBuf, color_eyre::eyre::Error> {
 }
 
 #[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
 pub struct ColorsConfig {
     pub background: Color,
     pub text: Color,

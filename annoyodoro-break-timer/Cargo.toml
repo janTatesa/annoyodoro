@@ -17,3 +17,5 @@ iced_layershell = "0.13.6"
 color-eyre.workspace = true
 annoyodoro-config.workspace = true
 cli-log.workspace = true
+clap.workspace = true
+tap.workspace = true

@@ -12,13 +12,7 @@
   outputs =
     inputs:
     let
-      deps = (
-        pkgs: [
-          pkgs.wayland
-          pkgs.libxkbcommon
-          pkgs.vulkan-loader
-        ]
-      );
+
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -46,14 +40,66 @@
             "rustfmt"
           ];
         };
+
+        deps = [
+          prev.wayland
+          prev.libxkbcommon
+          prev.vulkan-loader
+        ];
       };
+
+      packages = forEachSupportedSystem (
+        { pkgs }:
+        let
+          homepage = "https://github.com/TadoTheMiner/annoyodoro";
+          license = pkgs.lib.licenses.mit;
+        in
+        rec {
+          default = annoyodoro;
+          annoyodoro = pkgs.rustPlatform.buildRustPackage rec {
+            name = "annoyodoro";
+
+            src = pkgs.lib.cleanSource ./.;
+            buildInputs = pkgs.deps;
+
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+              # Allow dependencies to be fetched from git and avoid having to set the outputHashes manually
+              allowBuiltinFetchGit = true;
+            };
+            meta = {
+              description = "An annoying pomodoro timer";
+              inherit homepage license;
+              mainProgram = name;
+            };
+          };
+
+          annoyodoro-break-timer = pkgs.rustPlatform.buildRustPackage rec {
+            name = "annoyodoro-break-timer";
+
+            src = pkgs.lib.cleanSource ./.;
+
+            buildInputs = pkgs.deps;
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+              # Allow dependencies to be fetched from git and avoid having to set the outputHashes manually
+              allowBuiltinFetchGit = true;
+            };
+
+            meta = {
+              description = "Gui for annoyodoro";
+              inherit homepage license;
+              mainProgram = name;
+            };
+          };
+        }
+      );
 
       devShells = forEachSupportedSystem (
         { pkgs }:
         {
           default = pkgs.mkShell {
             packages = with pkgs; [
-              wayland
               rustToolchain
               openssl
               pkg-config
@@ -66,7 +112,7 @@
             env = {
               # Required by rust-analyzer
               RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-              RUSTFLAGS = "-C link-args=-Wl,-rpath,${pkgs.lib.makeLibraryPath (deps pkgs)}";
+              RUSTFLAGS = "-C link-args=-Wl,-rpath,${pkgs.lib.makeLibraryPath pkgs.deps}";
               ANNOYODORO_LOG = "debug";
             };
           };

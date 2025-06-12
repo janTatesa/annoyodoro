@@ -131,10 +131,12 @@ name = "annoyodoro-break-timer"
 version = "0.1.0"
 dependencies = [
  "annoyodoro-config",
+ "clap",
  "cli-log",
  "color-eyre",
  "iced",
  "iced_layershell",
+ "tap",
 ]
 
 [[package]]

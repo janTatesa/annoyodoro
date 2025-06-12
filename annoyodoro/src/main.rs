@@ -7,7 +7,6 @@ mod ui;
 
 use std::{fs, time::Duration};
 
-use annoyodoro_break_timer::spawn_break_timer;
 use annoyodoro_config::{print_default_config, write_default_config};
 use app::{App, now};
 use clap::Parser;
@@ -32,16 +31,6 @@ async fn main() -> Result<()> {
     if cli.write_default_config {
         return write_default_config();
     };
-
-    if cli.test_break_timer {
-        return spawn_break_timer(
-            cli.output,
-            Some(cli.overtime_duration.into()),
-            cli.break_duration.into(),
-            false,
-        )
-        .map(|r| println!("{:?}", r));
-    }
 
     fs::create_dir_all(State::get_path())?;
     let result = App {

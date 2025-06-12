@@ -1,5 +1,6 @@
-# Font name is whathever sans-serif is in your system
-font_size = 100
+[font]
+size = 100
+name = "sans-serif"
 [colors]
 background = "#1e1e2e"
 text = "#cdd6f4"

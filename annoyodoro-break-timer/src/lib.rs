@@ -1,7 +1,10 @@
 mod iced_implementation;
 mod view;
 
-use std::time::{Duration, SystemTime};
+use std::{
+    sync::Mutex,
+    time::{Duration, SystemTime},
+};
 
 use annoyodoro_config::{ColorsConfig, Config};
 use cli_log::error;
@@ -12,6 +15,7 @@ use iced_layershell::{
     reexport::{Anchor, KeyboardInteractivity, Layer},
     settings::{LayerShellSettings, Settings, StartMode},
 };
+use tap::Pipe;
 
 const NAME: &str = "Break time";
 
@@ -19,6 +23,20 @@ const NAME: &str = "Break time";
 pub enum BreakTimeResult {
     OvertimeUsed,
     BreakComplete(Duration),
+}
+
+static FONT_REF: Mutex<StringRefStore> = Mutex::new(StringRefStore("sans-serif"));
+
+struct StringRefStore(&'static str);
+
+impl StringRefStore {
+    fn get(&mut self, string: String) -> &'static str {
+        if string != self.0 {
+            self.0 = string.leak();
+        }
+
+        self.0
+    }
 }
 
 pub fn spawn_break_timer(
@@ -61,8 +79,12 @@ pub fn spawn_break_timer(
     BreakTimer::run(Settings {
         layer_settings,
         flags,
-        default_font: Font::with_name("sans-serif"),
-        default_text_size: Pixels(config.font_size),
+        default_font: FONT_REF
+            .try_lock()
+            .unwrap()
+            .get(config.font.name)
+            .pipe(Font::with_name),
+        default_text_size: Pixels(config.font.size),
         id: None,
         fonts: Vec::default(),
         antialiasing: false,
