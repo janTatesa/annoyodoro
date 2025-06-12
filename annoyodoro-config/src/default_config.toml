@@ -1,0 +1,7 @@
+# Font name is whathever sans-serif is in your system
+font-size = 100
+[colors]
+background = "#1e1e2e"
+text = "#cdd6f4"
+accent = "#cba6f7"
+warning = "#f38ba8"

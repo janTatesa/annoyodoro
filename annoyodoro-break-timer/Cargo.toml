@@ -1,0 +1,19 @@
+[package]
+name = "annoyodoro-break-timer"
+description = "Gui for annoyodoro"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+categories.workspace = true
+keywords.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+iced = { version = "0.13", features = ["smol"] }
+# https://github.com/waycrate/exwlshelleventloop/issues/171
+iced_layershell = "0.13.6"
+color-eyre.workspace = true
+annoyodoro-config.workspace = true
+cli-log.workspace = true
