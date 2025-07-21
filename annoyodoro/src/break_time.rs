@@ -23,6 +23,7 @@ impl App {
             available_overtime,
             self.break_duration(),
             self.should_do_long_break(),
+            &mut self.current_font,
         )?;
 
         match result {

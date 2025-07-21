@@ -1,4 +1,4 @@
-use annoyodoro_break_timer::{BreakTimeResult, spawn_break_timer};
+use annoyodoro_break_timer::{BreakTimeResult, CurrentFont, spawn_break_timer};
 use annoyodoro_config::{duration::*, print_default_config, write_default_config};
 
 use clap::{ArgAction::SetTrue, Parser, arg};
@@ -57,6 +57,7 @@ fn main() -> Result<()> {
         (!cli.no_overtime).then_some(cli.overtime_duration.into()),
         duration,
         cli.long_break,
+        &mut CurrentFont::default(),
     )
     .map(|break_time_result| match break_time_result {
         BreakTimeResult::OvertimeUsed => println!("User has used overtime"),

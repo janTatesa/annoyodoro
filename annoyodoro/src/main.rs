@@ -7,6 +7,7 @@ mod ui;
 
 use std::{fs, time::Duration};
 
+use annoyodoro_break_timer::CurrentFont;
 use annoyodoro_config::{print_default_config, write_default_config};
 use app::{App, now};
 use clap::Parser;
@@ -44,6 +45,7 @@ async fn main() -> Result<()> {
         event_stream: EventStream::new(),
         state_date: now()?,
         state_backup_interval: interval(Duration::from_secs(200)),
+        current_font: CurrentFont::default(),
     }
     .run(&mut ratatui::init())
     .await;

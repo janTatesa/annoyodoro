@@ -27,7 +27,7 @@ impl State {
 
     pub fn read() -> Result<Self> {
         Ok(serde_json::from_str(&fs::read_to_string(
-            Self::get_path().tap_mut(|p| p.push(now().unwrap().to_string())),
+            Self::get_path().tap_mut(|p| p.push(now().unwrap().to_string() + ".json")),
         )?)?)
     }
 

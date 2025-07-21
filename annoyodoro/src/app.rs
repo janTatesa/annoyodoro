@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use ::time::{Date, OffsetDateTime};
+use annoyodoro_break_timer::CurrentFont;
 use color_eyre::Result;
 use crossterm::event::EventStream;
 use futures::{FutureExt, StreamExt};
@@ -24,6 +25,8 @@ pub struct App {
     pub state_backup_interval: Interval,
 
     pub cli: Cli,
+
+    pub current_font: CurrentFont,
 }
 
 impl App {
