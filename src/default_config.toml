@@ -1,0 +1,13 @@
+font = "sans-serif"
+
+[colors]
+background = "#1e1e2e"
+text = "#cdd6f4"
+accent = "#cba6f7"
+danger = "#f38ba8"
+
+[pomodoro]
+break_duration = 5
+work_duration = 20
+long_break_duration = 25
+long_break_each = 4
