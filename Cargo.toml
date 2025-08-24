@@ -24,6 +24,3 @@ csscolorparser = "0.7"
 bincode = { version = "2.0", features = ["serde"] }
 itertools = "0.14"
 iced = { version = "0.13", features = ["debug", "smol"] }
-
-[build-dependencies]
-isahc = "1.7"

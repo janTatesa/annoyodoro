@@ -3,7 +3,7 @@ use iced::{
     widget::{Button, button, text, text::Shaping::Advanced}
 };
 
-pub static ICON_FONT: &[u8] = include_bytes!("../target/Lucide-0.541.0.ttf");
+pub static ICON_FONT: &[u8] = include_bytes!("./Lucide-0.541.0.ttf");
 
 macro_rules! icon {
     ($name:ident = $icon:literal) => {

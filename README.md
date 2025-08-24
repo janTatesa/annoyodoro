@@ -1,0 +1,1 @@
+An annoying pomodoro timer that doesn't make you rely on your willpower. It will cover your screen with an overlay. Currently the application supports only one screen as I can't test if it will work properly on all screens when I have only one screen. Itis pretty early in development
