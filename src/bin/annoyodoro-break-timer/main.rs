@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 
     let config = Config::new()?;
 
-    spawn_break_timer(cli.is_long_break, &config)?;
-
+    let goal = spawn_break_timer(cli.is_long_break, &config)?;
+    println!("{goal}");
     Ok(())
 }

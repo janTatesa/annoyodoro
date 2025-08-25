@@ -1,13 +1,14 @@
 mod cli;
-mod stats;
+mod pomodori_count;
 mod subscription;
 mod work_timer;
 
-use std::{iter, time::Instant};
+use std::{fs::OpenOptions, io::Write, iter, time::Instant};
 
 use annoyodoro::{
     BORDER_RADIUS, HumanReadableDuration, break_timer,
     config::Config,
+    data_dir,
     icons::{ICON_FONT, pause_button, resume_button}
 };
 use clap::{Parser, crate_name};
@@ -23,7 +24,7 @@ use iced::{
 };
 use time::Duration;
 
-use crate::{stats::PomodoriCountManager, work_timer::WorkTimer};
+use crate::{pomodori_count::PomodoriCountManager, work_timer::WorkTimer};
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -65,7 +66,7 @@ struct ErrorState {
     retry_message: Message
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Message {
     TogglePause,
     Tick(Instant),
@@ -76,6 +77,7 @@ enum Message {
     },
     RetrySaveStats,
     RetryReloadStats,
+    RetryAddWorkGoal(String),
 
     #[cfg(debug_assertions)]
     DebugEarlyBreak
@@ -92,18 +94,45 @@ impl Annoyodoro {
         })
     }
 
+    fn on_err(&mut self, report: Report, error_msg: &'static str, retry_message: Message) {
+        self.error = Some(ErrorState {
+            report: report.wrap_err(error_msg),
+            retry_message
+        })
+    }
+
+    fn add_work_goal(&mut self, goal: String) {
+        if let Err(report) = Self::try_add_work_goal(&goal) {
+            self.on_err(
+                report,
+                "Failed to add work goal",
+                Message::RetryAddWorkGoal(goal)
+            )
+        }
+    }
+
+    fn try_add_work_goal(goal: &str) -> Result<()> {
+        let mut path = data_dir()?;
+        path.push("work-goals.txt");
+        let mut file = OpenOptions::new().append(true).create(true).open(&path)?;
+        writeln!(file, "{goal}")?;
+        Ok(())
+    }
+
     fn break_time(&mut self, long_break: bool) {
         match break_timer::spawn_break_timer(long_break, &self.config) {
-            Ok(_) => {
+            Ok(work_goal) => {
                 self.work_timer = WorkTimer::new(self.config.pomodoro.work_duration);
                 self.pomodori_count.increment();
-                self.save_stats()
+                self.save_stats();
+                self.add_work_goal(work_goal);
             }
             Err(report) => {
-                self.error = Some(ErrorState {
-                    report: report.wrap_err("Failed to spawn break timer"),
-                    retry_message: Message::RetryBreakTimer { long_break }
-                })
+                self.on_err(
+                    report,
+                    "Failed to spawn break timer",
+                    Message::RetryBreakTimer { long_break }
+                );
             }
         }
     }
@@ -111,21 +140,13 @@ impl Annoyodoro {
     fn save_stats(&mut self) {
         match self.pomodori_count.save() {
             Ok(_) => self.reload_stats_if_needed(),
-            Err(report) => {
-                self.error = Some(ErrorState {
-                    report: report.wrap_err("Failed to save stats"),
-                    retry_message: Message::RetrySaveStats
-                })
-            }
+            Err(report) => self.on_err(report, "Failed to save stats", Message::RetrySaveStats)
         }
     }
 
     fn reload_stats_if_needed(&mut self) {
         if let Err(report) = self.pomodori_count.reload_if_needed() {
-            self.error = Some(ErrorState {
-                report: report.wrap_err("Failed to reload stats"),
-                retry_message: Message::RetryReloadStats
-            })
+            self.on_err(report, "Failed to reload stats", Message::RetryReloadStats);
         }
     }
 
@@ -163,7 +184,6 @@ impl Annoyodoro {
                     return self.update(retry_message)
                 }
             }
-
             #[cfg(debug_assertions)]
             Message::DebugEarlyBreak => {
                 self.long_break_in -= 1;
@@ -176,6 +196,7 @@ impl Annoyodoro {
 
                 self.break_time(long_break);
             }
+            Message::RetryAddWorkGoal(goal) => self.add_work_goal(goal)
         }
 
         Task::none()
@@ -185,11 +206,11 @@ impl Annoyodoro {
         let palette = self.config.theme().palette();
 
         if let Some(ErrorState {
-            ref report,
+            report,
             retry_message
-        }) = self.error
+        }) = &self.error
         {
-            return Self::error_view(palette, report, retry_message);
+            return Self::error_view(palette, report, retry_message.clone());
         }
 
         let time_left = Text::new(HumanReadableDuration(

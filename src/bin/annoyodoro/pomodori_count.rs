@@ -2,11 +2,11 @@
 
 use std::{
     collections::BTreeMap,
-    fs::{self, File},
-    io::{BufReader, BufWriter, ErrorKind},
-    path::PathBuf
+    fs::File,
+    io::{BufReader, BufWriter, ErrorKind}
 };
 
+use annoyodoro::data_dir;
 use bincode::{Decode, Encode, decode_from_reader, encode_into_std_write};
 #[cfg(not(debug_assertions))]
 use clap::crate_name;
@@ -88,25 +88,6 @@ impl<K: From<Date> + Ord> PomodoriCountMap<K> {
 }
 
 impl PomodoriCountManager {
-    #[cfg(not(debug_assertions))]
-    fn path() -> Result<PathBuf> {
-        let mut path = dirs::data_dir().ok_or_eyre("Cannot determine data dir")?;
-        path.push(crate_name!());
-        fs::create_dir_all(&path)?;
-        path.push("stats.bin");
-        Ok(path)
-    }
-
-    #[cfg(debug_assertions)]
-    fn path() -> Result<PathBuf> {
-        use std::iter;
-
-        let mut path = PathBuf::from_iter(iter::once("testing-files"));
-        fs::create_dir_all(&path)?;
-        path.push("pomodori-count.bin");
-        Ok(path)
-    }
-
     fn today() -> Result<Date> {
         Ok(OffsetDateTime::now_local()
             .wrap_err("Cannot determine current date")?
@@ -115,7 +96,8 @@ impl PomodoriCountManager {
 
     pub fn load() -> Result<Self> {
         let current_date = Self::today()?;
-        let path = Self::path()?;
+        let mut path = data_dir()?;
+        path.push("stats.bin");
         let file = match File::open(&path) {
             Ok(file) => file,
             Err(error) if error.kind() == ErrorKind::NotFound => {
@@ -138,7 +120,8 @@ impl PomodoriCountManager {
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = Self::path()?;
+        let mut path = data_dir()?;
+        path.push("stats.bin");
         let mut writer = BufWriter::new(
             File::create(&path)
                 .wrap_err_with(|| format!("Cannot open {}", path.to_string_lossy()))?
