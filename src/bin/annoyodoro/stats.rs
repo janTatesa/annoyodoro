@@ -9,6 +9,8 @@ use std::{
 
 use bincode::{Decode, Encode, decode_from_reader, encode_into_std_write};
 #[cfg(not(debug_assertions))]
+use clap::crate_name;
+#[cfg(not(debug_assertions))]
 use color_eyre::eyre::OptionExt;
 use color_eyre::eyre::{Context, Report, Result};
 use serde::{Deserialize, Serialize};

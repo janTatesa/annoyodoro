@@ -13,13 +13,11 @@ use annoyodoro::{
 use clap::{Parser, crate_name};
 use cli::Cli;
 use color_eyre::{Result, eyre::Report};
-#[cfg(debug_assertions)]
-use iced::Theme;
 use iced::{
     Alignment::Center,
     Border, Element,
     Length::Fill,
-    Padding, Task,
+    Padding, Task, Theme,
     theme::Palette,
     widget::{Button, Column, Container, Text, button, column, rich_text, row, text::Span}
 };
