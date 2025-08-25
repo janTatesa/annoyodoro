@@ -4,7 +4,6 @@ use color_eyre::Result;
 use iced::{
     Border, Element, Event, Length, Pixels, Subscription, Task, Theme,
     alignment::{Horizontal, Vertical},
-    border::Radius,
     event::{self, Status},
     executor, exit, keyboard,
     widget::{Button, Container, Text, button, column},
@@ -19,7 +18,7 @@ use iced_layershell::{
 use itertools::chain;
 use time::Duration;
 
-use crate::{HumanReadableDuration, config::Config};
+use crate::{BORDER_RADIUS, HumanReadableDuration, config::Config};
 
 struct BreakTimer {
     last_tick: Instant,
@@ -128,7 +127,7 @@ impl Application for BreakTimer {
             let base = button::primary(theme, status);
             button::Style {
                 border: Border {
-                    radius: Radius::new(20),
+                    radius: BORDER_RADIUS,
                     ..base.border
                 },
                 ..base

@@ -82,6 +82,8 @@
             ++ (old.packages or [ ]);
 
             env = {
+              ICED_BACKEND = "wgpu";
+              RUST_BACKTRACE = 1;
               RUST_SRC_PATH = "${rustToolchain pkgs}/lib/rustlib/src/rust/library";
             };
           });

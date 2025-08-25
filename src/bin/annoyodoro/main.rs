@@ -3,22 +3,25 @@ mod stats;
 mod subscription;
 mod work_timer;
 
-use std::time::Instant;
+use std::{iter, time::Instant};
 
 use annoyodoro::{
-    HumanReadableDuration, break_timer,
+    BORDER_RADIUS, HumanReadableDuration, break_timer,
     config::Config,
     icons::{ICON_FONT, pause_button, resume_button}
 };
 use clap::{Parser, crate_name};
 use cli::Cli;
 use color_eyre::{Result, eyre::Report};
+#[cfg(debug_assertions)]
+use iced::Theme;
 use iced::{
     Alignment::Center,
-    Element,
+    Border, Element,
     Length::Fill,
-    Task,
-    widget::{Container, Text, column, rich_text, row, text::Span}
+    Padding, Task,
+    theme::Palette,
+    widget::{Button, Column, Container, Text, button, column, rich_text, row, text::Span}
 };
 use time::Duration;
 
@@ -70,9 +73,14 @@ enum Message {
     Tick(Instant),
 
     Retry,
-    RetryBreakTimer { long_break: bool },
+    RetryBreakTimer {
+        long_break: bool
+    },
     RetrySaveStats,
-    RetryReloadStats
+    RetryReloadStats,
+
+    #[cfg(debug_assertions)]
+    DebugEarlyBreak
 }
 
 impl Annoyodoro {
@@ -89,6 +97,7 @@ impl Annoyodoro {
     fn break_time(&mut self, long_break: bool) {
         match break_timer::spawn_break_timer(long_break, &self.config) {
             Ok(_) => {
+                self.work_timer = WorkTimer::new(self.config.pomodoro.work_duration);
                 self.pomodori_count.increment();
                 self.save_stats()
             }
@@ -139,7 +148,6 @@ impl Annoyodoro {
                 }
             }
             Message::TogglePause => self.work_timer.toggle_pause(),
-
             Message::RetryBreakTimer { long_break } => {
                 self.error = None;
                 self.break_time(long_break)
@@ -153,9 +161,22 @@ impl Annoyodoro {
                 self.reload_stats_if_needed()
             }
             Message::Retry => {
-                if let Some(ErrorState { retry_message, .. }) = self.error {
-                    return Task::done(retry_message)
+                if let Some(ErrorState { retry_message, .. }) = self.error.take() {
+                    return self.update(retry_message)
                 }
+            }
+
+            #[cfg(debug_assertions)]
+            Message::DebugEarlyBreak => {
+                self.long_break_in -= 1;
+                let long_break = if self.long_break_in == 0 {
+                    self.long_break_in = self.config.pomodoro.long_break_each.into();
+                    true
+                } else {
+                    false
+                };
+
+                self.break_time(long_break);
             }
         }
 
@@ -164,8 +185,13 @@ impl Annoyodoro {
 
     fn view(&self) -> Element<'_, Message> {
         let palette = self.config.theme().palette();
-        if let Some(ErrorState { report, .. }) = &self.error {
-            todo!("Error handling not yet supported {report}")
+
+        if let Some(ErrorState {
+            ref report,
+            retry_message
+        }) = self.error
+        {
+            return Self::error_view(palette, report, retry_message);
         }
 
         let time_left = Text::new(HumanReadableDuration(
@@ -195,9 +221,21 @@ impl Annoyodoro {
                 Span::new(self.long_break_in.to_string()).color(palette.primary),
                 " pomodori"
             ]
+            .size(60),
+            rich_text![
+                "Pomodori today: ",
+                Span::new(self.pomodori_count.daily().to_string()).color(palette.primary)
+            ]
             .size(60)
         ]
         .align_x(Center);
+
+        #[cfg(debug_assertions)]
+        let column = column.push(
+            Button::new(Text::new("Early break (enabled only in debug mode)").size(60))
+                .on_press(Message::DebugEarlyBreak)
+                .style(Self::button_rounded_corners)
+        );
 
         Container::new(column)
             .align_x(Center)
@@ -205,5 +243,48 @@ impl Annoyodoro {
             .width(Fill)
             .height(Fill)
             .into()
+    }
+
+    fn error_view(
+        palette: Palette,
+        report: &Report,
+        retry_message: Message
+    ) -> Element<'_, Message> {
+        let column = Column::from_iter(
+            iter::once(
+                row![
+                    Text::new(report.to_string()).color(palette.danger).size(80),
+                    Button::new(Text::new("Retry").size(60))
+                        .on_press(retry_message)
+                        .style(Self::button_rounded_corners)
+                ]
+                .spacing(20)
+                .align_y(Center)
+                .into()
+            )
+            .chain(report.chain().skip(1).map(|err| {
+                Container::new(Text::new(err.to_string()).size(60))
+                    .padding(Padding::default().left(60))
+                    .into()
+            }))
+        );
+
+        Container::new(column)
+            .width(Fill)
+            .height(Fill)
+            .align_x(Center)
+            .align_y(Center)
+            .into()
+    }
+
+    fn button_rounded_corners(theme: &Theme, status: button::Status) -> button::Style {
+        let base = button::primary(theme, status);
+        button::Style {
+            border: Border {
+                radius: BORDER_RADIUS,
+                ..base.border
+            },
+            ..base
+        }
     }
 }

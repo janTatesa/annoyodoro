@@ -8,10 +8,9 @@ use std::{
 };
 
 use bincode::{Decode, Encode, decode_from_reader, encode_into_std_write};
-use clap::crate_name;
 #[cfg(not(debug_assertions))]
 use color_eyre::eyre::OptionExt;
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre::{Context, Report, Result};
 use serde::{Deserialize, Serialize};
 use time::{Date, OffsetDateTime};
 
@@ -80,6 +79,10 @@ impl<K: From<Date> + Ord> PomodoriCountMap<K> {
     fn increment(&mut self, date: Date) {
         *self.0.entry(K::from(date)).or_insert(0) += 1;
     }
+
+    fn get(&self, date: Date) -> u32 {
+        self.0.get(&K::from(date)).copied().unwrap_or(0)
+    }
 }
 
 impl PomodoriCountManager {
@@ -94,8 +97,9 @@ impl PomodoriCountManager {
 
     #[cfg(debug_assertions)]
     fn path() -> Result<PathBuf> {
-        let mut path = PathBuf::new();
-        path.push(crate_name!());
+        use std::iter;
+
+        let mut path = PathBuf::from_iter(iter::once("testing-files"));
         fs::create_dir_all(&path)?;
         path.push("pomodori-count.bin");
         Ok(path)
@@ -109,7 +113,8 @@ impl PomodoriCountManager {
 
     pub fn load() -> Result<Self> {
         let current_date = Self::today()?;
-        let file = match File::open(Self::path()?) {
+        let path = Self::path()?;
+        let file = match File::open(&path) {
             Ok(file) => file,
             Err(error) if error.kind() == ErrorKind::NotFound => {
                 return Ok(Self {
@@ -117,7 +122,11 @@ impl PomodoriCountManager {
                     pomodori_count: PomodoriCount::default()
                 })
             }
-            Err(error) => return Err(error.into())
+            Err(error) => {
+                return Err(
+                    Report::new(error).wrap_err(format!("Cannot open {}", path.to_string_lossy()))
+                )
+            }
         };
         let reader = BufReader::new(file);
         Ok(Self {
@@ -127,7 +136,12 @@ impl PomodoriCountManager {
     }
 
     pub fn save(&self) -> Result<()> {
-        let mut writer = BufWriter::new(File::open(Self::path()?)?);
+        let path = Self::path()?;
+        let mut writer = BufWriter::new(
+            File::create(&path)
+                .wrap_err_with(|| format!("Cannot open {}", path.to_string_lossy()))?
+        );
+
         encode_into_std_write(
             &self.pomodori_count,
             &mut writer,
@@ -154,5 +168,9 @@ impl PomodoriCountManager {
         }
 
         Ok(())
+    }
+
+    pub fn daily(&self) -> u32 {
+        self.pomodori_count.day.get(self.current_date)
     }
 }

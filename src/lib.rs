@@ -2,8 +2,18 @@ pub mod break_timer;
 pub mod config;
 pub mod icons;
 
-use iced::widget::text::{Fragment, IntoFragment};
+use iced::{
+    border::Radius,
+    widget::text::{Fragment, IntoFragment}
+};
 use time::Duration;
+
+pub const BORDER_RADIUS: Radius = Radius {
+    top_left: 20.,
+    top_right: 20.,
+    bottom_right: 20.,
+    bottom_left: 20.
+};
 
 pub struct HumanReadableDuration(pub Duration);
 impl IntoFragment<'static> for HumanReadableDuration {

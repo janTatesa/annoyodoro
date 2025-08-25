@@ -23,16 +23,20 @@ impl WorkTimer {
 
     pub fn toggle_pause(&mut self) {
         self.last_tick = match self.last_tick {
-            Some(_) => None,
+            Some(tick) => {
+                self.work_duration_remaining =
+                    self.work_duration_remaining.saturating_sub(tick.elapsed());
+                None
+            }
             None => Some(Instant::now())
         }
     }
 
     pub fn on_tick(&mut self, now: Instant) {
-        if let Some(last_tick) = self.last_tick {
+        if let Some(tick) = self.last_tick {
             self.work_duration_remaining = self
                 .work_duration_remaining
-                .saturating_sub(now.duration_since(last_tick));
+                .saturating_sub(now.duration_since(tick));
             self.last_tick = Some(now);
         }
     }
