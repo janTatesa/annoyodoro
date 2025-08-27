@@ -35,17 +35,10 @@
                     };
                     rustfmt = prev.lib.hiPrio prev.rust-bin.nightly.latest.rustfmt;
                     deps = with prev; [
-                      expat
-                      fontconfig
-                      freetype
-                      freetype.dev
-                      libGL
                       wayland
                       libxkbcommon
                       vulkan-loader
                     ];
-
-                    RUSTFLAGS = "-C link-arg=-Wl,-rpath,${final.lib.makeLibraryPath final.deps}";
                   })
 
                 ];
@@ -55,28 +48,33 @@
 
       package =
         pkgs: name: description:
-        pkgs.rustPlatform.buildRustPackage rec {
-          inherit name;
+        (pkgs.makeRustPlatform {
+          rustc = pkgs.rustToolchain;
+          cargo = pkgs.rustToolchain;
+        }).buildRustPackage
+          {
+            inherit name;
+            src = pkgs.lib.cleanSource ./.;
+            env.ICED_BACKEND = "wgpu";
+            buildInputs = pkgs.deps;
+            nativeBuildInputs = [ pkgs.pkg-config ];
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+              allowBuiltinFetchGit = true;
+            };
 
-          src = pkgs.lib.cleanSource ./.;
+            postFixup = ''
+              rpath=$(patchelf --print-rpath $out/bin/${name})
+              patchelf --set-rpath "$rpath:${pkgs.lib.makeLibraryPath pkgs.deps}" $out/bin/${name}
+            '';
 
-          env = {
-            RUSTFLAGS = pkgs.RUSTFLAGS;
-            ICED_BACKEND = "wgpu";
+            meta = {
+              inherit description;
+              homepage = "https://github.com/janTatesa/annoyodoro";
+              license = pkgs.lib.licenses.mit;
+              mainProgram = name;
+            };
           };
-
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            allowBuiltinFetchGit = true;
-          };
-
-          meta = {
-            inherit description;
-            homepage = "https://github.com/janTatesa/annoyodoro";
-            license = pkgs.lib.licenses.mit;
-            mainProgram = name;
-          };
-        };
     in
     {
       packages = forEachSupportedSystem (
@@ -96,13 +94,12 @@
               pkg-config
               rustfmt
               rustToolchain
-              openssl
             ];
 
             env = {
               ICED_BACKEND = "wgpu";
               RUST_BACKTRACE = 1;
-              RUSTFLAGS = pkgs.RUSTFLAGS;
+              RUSTFLAGS = "-C link-arg=-Wl,-rpath,${pkgs.lib.makeLibraryPath pkgs.deps}";
             };
           };
         }

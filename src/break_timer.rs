@@ -5,11 +5,13 @@ use std::{
 };
 
 use color_eyre::Result;
+#[cfg(debug_assertions)]
+use iced::widget::Button;
 use iced::{
     Border, Element, Length, Padding, Pixels, Subscription, Task, Theme,
     alignment::{Horizontal, Vertical},
     executor,
-    widget::{Button, Container, Text, TextInput, button, column, focus_next, text_input},
+    widget::{Container, Text, TextInput, button, column, focus_next, text_input},
     window::Id
 };
 use iced_sessionlock::{MultiApplication, actions::UnLockAction, settings::Settings};
@@ -131,17 +133,6 @@ impl MultiApplication for BreakTimer {
         };
 
         let time_left = HumanReadableDuration(self.break_duration_left);
-        let rounded_corners = |theme: &Theme, status| {
-            let base = button::primary(theme, status);
-            button::Style {
-                border: Border {
-                    radius: BORDER_RADIUS,
-                    ..base.border
-                },
-                ..base
-            }
-        };
-
         let on_submit =
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
@@ -172,7 +163,16 @@ impl MultiApplication for BreakTimer {
         #[cfg(debug_assertions)]
         let column = column.push(
             Button::new(Text::new("Skip break button (enabled only when debugging)").size(40))
-                .style(rounded_corners)
+                .style(|theme: &Theme, status| {
+                    let base = button::primary(theme, status);
+                    button::Style {
+                        border: Border {
+                            radius: BORDER_RADIUS,
+                            ..base.border
+                        },
+                        ..base
+                    }
+                })
                 .on_press(Message::ContinueWorking)
         );
 
