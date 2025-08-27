@@ -46,7 +46,7 @@ impl Annoyodoro {
             self.error
                 .is_some()
                 .then(|| event::listen_with(Self::retry_subscription)),
-            (!self.work_timer.is_paused())
+            (!self.work_timer.is_paused() && !self.break_time)
                 .then(|| iced::time::every(Duration::from_secs(1)).map(Message::Tick)),
             iter::once(event::listen_with(Self::toggle_pause_subscription))
         ];

@@ -27,7 +27,6 @@ use time::Duration;
 use crate::{pomodori_count::PomodoriCountManager, work_timer::WorkTimer};
 
 fn main() -> Result<()> {
-    color_eyre::install()?;
     let cli = Cli::parse();
 
     if cli.print_default_config {
@@ -54,6 +53,7 @@ fn main() -> Result<()> {
 }
 
 struct Annoyodoro {
+    break_time: bool,
     long_break_in: u16,
     work_timer: WorkTimer,
     config: Config,
@@ -70,14 +70,17 @@ struct ErrorState {
 enum Message {
     TogglePause,
     Tick(Instant),
-
-    Retry,
-    RetryBreakTimer {
+    BreakTime {
         long_break: bool
     },
+
+    Retry,
     RetrySaveStats,
     RetryReloadStats,
     RetryAddWorkGoal(String),
+    RetryBreakTimer {
+        long_break: bool
+    },
 
     #[cfg(debug_assertions)]
     DebugEarlyBreak
@@ -90,7 +93,8 @@ impl Annoyodoro {
             work_timer: WorkTimer::new(config.pomodoro.work_duration),
             config,
             pomodori_count: PomodoriCountManager::load()?,
-            error: None
+            error: None,
+            break_time: false
         })
     }
 
@@ -120,7 +124,9 @@ impl Annoyodoro {
     }
 
     fn break_time(&mut self, long_break: bool) {
-        match break_timer::spawn_break_timer(long_break, &self.config) {
+        let result = break_timer::spawn_break_timer(long_break, &self.config);
+        self.break_time = false;
+        match result {
             Ok(work_goal) => {
                 self.work_timer = WorkTimer::new(self.config.pomodoro.work_duration);
                 self.pomodori_count.increment();
@@ -163,25 +169,17 @@ impl Annoyodoro {
                         false
                     };
 
-                    self.break_time(long_break);
+                    self.break_time = true;
+                    return Task::done(Message::BreakTime { long_break });
                 }
             }
             Message::TogglePause => self.work_timer.toggle_pause(),
-            Message::RetryBreakTimer { long_break } => {
-                self.error = None;
-                self.break_time(long_break)
-            }
-            Message::RetrySaveStats => {
-                self.error = None;
-                self.save_stats()
-            }
-            Message::RetryReloadStats => {
-                self.error = None;
-                self.reload_stats_if_needed()
-            }
+            Message::BreakTime { long_break } => self.break_time(long_break),
+            Message::RetrySaveStats => self.save_stats(),
+            Message::RetryReloadStats => self.reload_stats_if_needed(),
             Message::Retry => {
                 if let Some(ErrorState { retry_message, .. }) = self.error.take() {
-                    return self.update(retry_message)
+                    return Task::done(retry_message)
                 }
             }
             #[cfg(debug_assertions)]
@@ -194,15 +192,25 @@ impl Annoyodoro {
                     false
                 };
 
-                self.break_time(long_break);
+                self.break_time = true;
+                return Task::done(Message::BreakTime { long_break });
             }
-            Message::RetryAddWorkGoal(goal) => self.add_work_goal(goal)
+            Message::RetryAddWorkGoal(goal) => self.add_work_goal(goal),
+            Message::RetryBreakTimer { long_break } => {
+                self.error = None;
+                self.break_time = true;
+                return Task::done(Message::BreakTime { long_break });
+            }
         }
 
         Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
+        if self.break_time {
+            return "If you're seeing this, the break timer ddidn't spawn and it's a bug".into();
+        }
+
         let palette = self.config.theme().palette();
 
         if let Some(ErrorState {
