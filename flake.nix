@@ -45,7 +45,7 @@
                       vulkan-loader
                     ];
 
-                    RUSTFLAGS = "-C link-arg=-Wl,-rpath,${final.lib.makeLibraryPath final.deps} -C link-arg=-fuse-ld=mold";
+                    RUSTFLAGS = "-C link-arg=-Wl,-rpath,${final.lib.makeLibraryPath final.deps}";
                   })
 
                 ];
@@ -70,7 +70,6 @@
             allowBuiltinFetchGit = true;
           };
 
-          nativeBuildInput = [ pkgs.mold ];
           meta = {
             inherit description;
             homepage = "https://github.com/janTatesa/annoyodoro";
@@ -98,7 +97,6 @@
               rustfmt
               rustToolchain
               openssl
-              mold
             ];
 
             env = {
