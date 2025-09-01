@@ -32,8 +32,9 @@ impl WorkTimer {
         }
     }
 
-    pub fn on_tick(&mut self, now: Instant) {
+    pub fn on_tick(&mut self) {
         if let Some(tick) = self.last_tick {
+            let now = Instant::now();
             self.work_duration_remaining = self
                 .work_duration_remaining
                 .saturating_sub(now.duration_since(tick));

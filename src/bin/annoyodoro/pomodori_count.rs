@@ -8,10 +8,6 @@ use std::{
 
 use annoyodoro::data_dir;
 use bincode::{Decode, Encode, decode_from_reader, encode_into_std_write};
-#[cfg(debug_assertions)]
-use clap::crate_name;
-#[cfg(debug_assertions)]
-use color_eyre::eyre::OptionExt;
 use color_eyre::eyre::{Context, Report, Result};
 use serde::{Deserialize, Serialize};
 use time::{Date, OffsetDateTime};

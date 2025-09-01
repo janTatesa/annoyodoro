@@ -3,7 +3,7 @@ mod pomodori_count;
 mod subscription;
 mod work_timer;
 
-use std::{fs::OpenOptions, io::Write, iter, time::Instant};
+use std::{fs::OpenOptions, io::Write, iter};
 
 use annoyodoro::{
     BORDER_RADIUS, HumanReadableDuration, break_timer,
@@ -69,10 +69,7 @@ struct ErrorState {
 #[derive(Debug, Clone)]
 enum Message {
     TogglePause,
-    Tick(Instant),
-    BreakTime {
-        long_break: bool
-    },
+    Tick,
 
     Retry,
     RetrySaveStats,
@@ -158,8 +155,8 @@ impl Annoyodoro {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Tick(now) => {
-                self.work_timer.on_tick(now);
+            Message::Tick => {
+                self.work_timer.on_tick();
                 if self.work_timer.duration_remaning().is_zero() {
                     self.long_break_in -= 1;
                     let long_break = if self.long_break_in == 0 {
@@ -170,11 +167,10 @@ impl Annoyodoro {
                     };
 
                     self.break_time = true;
-                    return Task::done(Message::BreakTime { long_break });
+                    self.break_time(long_break);
                 }
             }
             Message::TogglePause => self.work_timer.toggle_pause(),
-            Message::BreakTime { long_break } => self.break_time(long_break),
             Message::RetrySaveStats => self.save_stats(),
             Message::RetryReloadStats => self.reload_stats_if_needed(),
             Message::Retry => {
@@ -193,13 +189,13 @@ impl Annoyodoro {
                 };
 
                 self.break_time = true;
-                return Task::done(Message::BreakTime { long_break });
+                self.break_time(long_break);
             }
             Message::RetryAddWorkGoal(goal) => self.add_work_goal(goal),
             Message::RetryBreakTimer { long_break } => {
                 self.error = None;
                 self.break_time = true;
-                return Task::done(Message::BreakTime { long_break });
+                self.break_time(long_break);
             }
         }
 
