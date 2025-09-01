@@ -12,12 +12,13 @@ use color_eyre::eyre::{Context, Report, Result};
 use serde::{Deserialize, Serialize};
 use time::{Date, OffsetDateTime};
 
+#[derive(Clone)]
 pub struct PomodoriCountManager {
     current_date: Date,
     pomodori_count: PomodoriCount
 }
 
-#[derive(Encode, Decode, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Encode, Decode, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Week {
     pub year: Year,
     pub iso_week: u8
@@ -32,7 +33,7 @@ impl From<Date> for Week {
     }
 }
 
-#[derive(Encode, Decode, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Encode, Decode, PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct Month {
     pub year: Year,
     pub month: u8
@@ -47,7 +48,7 @@ impl From<Date> for Month {
     }
 }
 
-#[derive(Encode, Decode, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Encode, Decode, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Year(u16);
 impl From<Date> for Year {
     fn from(value: Date) -> Self {
@@ -55,7 +56,7 @@ impl From<Date> for Year {
     }
 }
 
-#[derive(Encode, Decode, Default)]
+#[derive(Encode, Decode, Default, Clone)]
 struct PomodoriCount {
     #[bincode(with_serde)]
     day: PomodoriCountMap<Date>,
@@ -65,7 +66,7 @@ struct PomodoriCount {
     all_time: u32
 }
 
-#[derive(Encode, Decode, Serialize, Deserialize)]
+#[derive(Encode, Decode, Serialize, Deserialize, Clone)]
 struct PomodoriCountMap<K: Ord>(BTreeMap<K, u32>);
 impl<K: Ord> Default for PomodoriCountMap<K> {
     fn default() -> Self {

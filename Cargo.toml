@@ -22,5 +22,5 @@ time = { version = "0.3", features = ["local-offset", "serde", "std"] }
 csscolorparser = "0.7"
 bincode = { version = "2.0", features = ["serde"] }
 itertools = "0.14"
-iced = { version = "0.13", features = ["debug", "smol"] }
-iced_sessionlock = "0.13"
+iced = { git = "https://github.com/iced-rs/iced", features = ["smol"] }
+iced_sessionlock.git = "https://github.com/waycrate/exwlshelleventloop/"

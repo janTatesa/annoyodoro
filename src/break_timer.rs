@@ -8,18 +8,18 @@ use color_eyre::Result;
 #[cfg(debug_assertions)]
 use iced::widget::Button;
 use iced::{
-    Border, Element, Length, Padding, Pixels, Subscription, Task, Theme,
+    Border, Element, Length, Padding, Task, Theme,
     alignment::{Horizontal, Vertical},
-    executor,
     widget::{Container, Text, TextInput, button, column, focus_next, text_input},
     window::Id
 };
-use iced_sessionlock::{MultiApplication, actions::UnLockAction, settings::Settings};
+use iced_sessionlock::{actions::UnLockAction, application};
 use time::Duration;
 
 use crate::{BORDER_RADIUS, HumanReadableDuration, config::Config};
 
-struct BreakTimer {
+#[derive(Clone)]
+pub struct BreakTimer {
     work_goal_tx: SyncSender<String>,
     last_tick: Instant,
     long_break: bool,
@@ -28,47 +28,39 @@ struct BreakTimer {
     theme: Theme
 }
 
-pub fn spawn_break_timer(long_break: bool, config: &Config) -> Result<String> {
-    let duration = if long_break {
-        config.pomodoro.long_break_duration
-    } else {
-        config.pomodoro.break_duration
-    };
+impl BreakTimer {
+    pub fn spawn(long_break: bool, config: Config) -> Result<String> {
+        let duration = if long_break {
+            config.pomodoro.long_break_duration
+        } else {
+            config.pomodoro.break_duration
+        };
 
-    let (work_goal_tx, work_goal_rx) = sync_channel(1);
-    let timer = BreakTimer {
-        last_tick: Instant::now(),
-        long_break,
-        break_duration_left: duration.try_into()?,
-        theme: config.theme(),
-        work_goal_tx,
-        work_goal: String::new()
-    };
+        let (work_goal_tx, work_goal_rx) = sync_channel(1);
+        let timer = BreakTimer {
+            last_tick: Instant::now(),
+            long_break,
+            break_duration_left: duration.try_into()?,
+            theme: config.theme(),
+            work_goal_tx,
+            work_goal: String::new()
+        };
 
-    BreakTimer::run(Settings {
-        id: None,
-        flags: timer,
-        default_font: config.font,
-        default_text_size: Pixels(16.),
-        antialiasing: false,
-        fonts: Vec::new()
-    })?;
+        application(
+            move || (timer.clone(), focus_next()),
+            BreakTimer::update,
+            BreakTimer::view
+        )
+        .default_font(config.font)
+        .theme(move |_, _| config.theme())
+        .subscription(|_| iced::time::every(iced::time::Duration::from_secs(1)).map(Message::Tick))
+        .run()?;
 
-    let work_goal = work_goal_rx
-        .try_recv()
-        .expect("Work goal should have been sent");
+        let work_goal = work_goal_rx
+            .try_recv()
+            .expect("Work goal should have been sent");
 
-    Ok(work_goal)
-}
-
-impl TryInto<UnLockAction> for Message {
-    type Error = Self;
-
-    fn try_into(self) -> Result<UnLockAction, Self::Error> {
-        match self {
-            Message::Exit => Ok(UnLockAction),
-            _ => Err(self)
-        }
+        Ok(work_goal)
     }
 }
 
@@ -80,24 +72,18 @@ enum Message {
     Tick(Instant)
 }
 
-impl MultiApplication for BreakTimer {
-    type Message = Message;
-    type Flags = Self;
-    type Theme = Theme;
-    type Executor = executor::Default;
+impl TryInto<UnLockAction> for Message {
+    type Error = Self;
 
-    fn new(timer: Self) -> (Self, Task<Message>) {
-        (timer, focus_next())
+    fn try_into(self) -> Result<UnLockAction, Self> {
+        match self {
+            Self::Exit => Ok(UnLockAction),
+            _ => Err(self)
+        }
     }
+}
 
-    fn namespace(&self) -> String {
-        String::from("annoyodoro-break-timer")
-    }
-
-    fn subscription(&self) -> Subscription<Self::Message> {
-        iced::time::every(iced::time::Duration::from_secs(1)).map(Message::Tick)
-    }
-
+impl BreakTimer {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ContinueWorking if !self.work_goal.is_empty() => {
@@ -116,7 +102,7 @@ impl MultiApplication for BreakTimer {
                 self.work_goal = goal;
                 Task::none()
             }
-            Message::Exit => panic!("iced_sessionlock should exit on this message")
+            Message::Exit => panic!("Iced sessionlock should exit on this action")
         }
     }
 
@@ -148,7 +134,7 @@ impl MultiApplication for BreakTimer {
                         let mut style = text_input::default(theme, status);
                         style.border.width = 4.;
                         style.border.radius = BORDER_RADIUS;
-                        if let text_input::Status::Focused = status {
+                        if let text_input::Status::Focused { .. } = status {
                             style.border.color = theme.palette().primary
                         }
 
@@ -182,9 +168,5 @@ impl MultiApplication for BreakTimer {
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
-    }
-
-    fn theme(&self) -> Self::Theme {
-        self.theme.clone()
     }
 }

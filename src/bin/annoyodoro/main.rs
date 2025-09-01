@@ -6,12 +6,13 @@ mod work_timer;
 use std::{fs::OpenOptions, io::Write, iter};
 
 use annoyodoro::{
-    BORDER_RADIUS, HumanReadableDuration, break_timer,
+    BORDER_RADIUS, HumanReadableDuration,
+    break_timer::BreakTimer,
     config::Config,
     data_dir,
     icons::{ICON_FONT, pause_button, resume_button}
 };
-use clap::{Parser, crate_name};
+use clap::Parser;
 use cli::Cli;
 use color_eyre::{Result, eyre::Report};
 use iced::{
@@ -41,13 +42,22 @@ fn main() -> Result<()> {
     let config = Config::new()?;
     let default_font = config.font;
     let theme = config.theme();
-    let app = Annoyodoro::new(config)?;
-    iced::application(crate_name!(), Annoyodoro::update, Annoyodoro::view)
-        .subscription(Annoyodoro::subscription)
-        .default_font(default_font)
-        .font(ICON_FONT)
-        .theme(move |_| theme.clone())
-        .run_with(|| (app, Task::none()))?;
+    let pomodori_count = PomodoriCountManager::load()?;
+    iced::application(
+        move || {
+            (
+                Annoyodoro::new(config, pomodori_count.clone()),
+                Task::none()
+            )
+        },
+        Annoyodoro::update,
+        Annoyodoro::view
+    )
+    .subscription(Annoyodoro::subscription)
+    .default_font(default_font)
+    .font(ICON_FONT)
+    .theme(move |_| theme.clone())
+    .run()?;
 
     Ok(())
 }
@@ -84,15 +94,15 @@ enum Message {
 }
 
 impl Annoyodoro {
-    fn new(config: Config) -> Result<Self> {
-        Ok(Annoyodoro {
+    fn new(config: Config, pomodori_count: PomodoriCountManager) -> Self {
+        Annoyodoro {
             long_break_in: config.pomodoro.long_break_each.into(),
             work_timer: WorkTimer::new(config.pomodoro.work_duration),
             config,
-            pomodori_count: PomodoriCountManager::load()?,
+            pomodori_count,
             error: None,
             break_time: false
-        })
+        }
     }
 
     fn on_err(&mut self, report: Report, error_msg: &'static str, retry_message: Message) {
@@ -121,7 +131,7 @@ impl Annoyodoro {
     }
 
     fn break_time(&mut self, long_break: bool) {
-        let result = break_timer::spawn_break_timer(long_break, &self.config);
+        let result = BreakTimer::spawn(long_break, self.config);
         self.break_time = false;
         match result {
             Ok(work_goal) => {
@@ -241,13 +251,13 @@ impl Annoyodoro {
             timer_row,
             rich_text![
                 "Next long break in ",
-                Span::new(self.long_break_in.to_string()).color(palette.primary),
+                Span::<()>::new(self.long_break_in.to_string()).color(palette.primary),
                 " pomodori"
             ]
             .size(60),
             rich_text![
                 "Pomodori today: ",
-                Span::new(self.pomodori_count.daily().to_string()).color(palette.primary)
+                Span::<()>::new(self.pomodori_count.daily().to_string()).color(palette.primary)
             ]
             .size(60)
         ]

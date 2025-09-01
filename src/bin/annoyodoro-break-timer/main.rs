@@ -1,4 +1,4 @@
-use annoyodoro::{break_timer::spawn_break_timer, config::Config};
+use annoyodoro::{break_timer::BreakTimer, config::Config};
 use clap::{ArgAction::SetTrue, Parser, arg};
 use color_eyre::eyre::Result;
 
@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 
     let config = Config::new()?;
 
-    let goal = spawn_break_timer(cli.is_long_break, &config)?;
+    let goal = BreakTimer::spawn(cli.is_long_break, config)?;
     println!("{goal}");
     Ok(())
 }

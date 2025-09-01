@@ -10,7 +10,7 @@ use figment::{
 use iced::{Color, Font, Theme, theme::Palette};
 use serde::{Deserialize, Deserializer, de::Error};
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(deserialize_with = "deserialize_font")]
@@ -27,7 +27,7 @@ where
     Ok(Font::with_name(name))
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PomodoroConfig {
     #[serde(deserialize_with = "deserialize_duration")]
@@ -127,7 +127,8 @@ impl Config {
                 text,
                 primary: accent,
                 success: accent,
-                danger
+                danger,
+                warning: danger
             }
         )
     }
