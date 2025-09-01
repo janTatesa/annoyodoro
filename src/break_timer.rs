@@ -10,7 +10,7 @@ use iced::widget::Button;
 use iced::{
     Border, Element, Length, Padding, Task, Theme,
     alignment::{Horizontal, Vertical},
-    widget::{Container, Text, TextInput, button, column, focus_next, text_input},
+    widget::{Container, Sensor, Text, TextInput, button, column, focus_next, text_input},
     window::Id
 };
 use iced_sessionlock::{actions::UnLockAction, application};
@@ -20,6 +20,7 @@ use crate::{BORDER_RADIUS, HumanReadableDuration, config::Config};
 
 #[derive(Clone)]
 pub struct BreakTimer {
+    needs_startup_focus: bool,
     work_goal_tx: SyncSender<String>,
     last_tick: Instant,
     long_break: bool,
@@ -43,11 +44,12 @@ impl BreakTimer {
             break_duration_left: duration.try_into()?,
             theme: config.theme(),
             work_goal_tx,
-            work_goal: String::new()
+            work_goal: String::new(),
+            needs_startup_focus: true
         };
 
         application(
-            move || (timer.clone(), focus_next()),
+            move || (timer.clone(), Task::none()),
             BreakTimer::update,
             BreakTimer::view
         )
@@ -69,7 +71,8 @@ enum Message {
     Exit,
     ContinueWorking,
     WorkGoalChange(String),
-    Tick(Instant)
+    Tick(Instant),
+    StartupFocus
 }
 
 impl TryInto<UnLockAction> for Message {
@@ -102,7 +105,11 @@ impl BreakTimer {
                 self.work_goal = goal;
                 Task::none()
             }
-            Message::Exit => panic!("Iced sessionlock should exit on this action")
+            Message::Exit => panic!("Iced sessionlock should exit on this action"),
+            Message::StartupFocus => {
+                self.needs_startup_focus = false;
+                focus_next()
+            }
         }
     }
 
@@ -141,7 +148,7 @@ impl BreakTimer {
                         style
                     })
             )
-            .padding(Padding::default().left(240).right(240))
+            .padding(Padding::default().left(240).right(240)),
         ]
         .align_x(Horizontal::Center)
         .spacing(20);
@@ -162,11 +169,18 @@ impl BreakTimer {
                 .on_press(Message::ContinueWorking)
         );
 
-        Container::new(column)
+        let container = Container::new(column)
             .align_x(Horizontal::Center)
             .align_y(Vertical::Center)
             .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+            .height(Length::Fill);
+
+        if self.needs_startup_focus {
+            return Sensor::new(container)
+                .on_show(|_| Message::StartupFocus)
+                .into();
+        }
+
+        container.into()
     }
 }

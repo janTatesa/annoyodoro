@@ -96,6 +96,7 @@ dependencies = [
  "iced_sessionlock",
  "itertools",
  "serde",
+ "smol",
  "time",
 ]
 
