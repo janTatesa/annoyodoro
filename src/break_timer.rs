@@ -6,11 +6,14 @@ use std::{
 
 use color_eyre::Result;
 #[cfg(debug_assertions)]
-use iced::widget::Button;
 use iced::{
-    Border, Element, Length, Padding, Task, Theme,
+    Border,
+    widget::{Button, button}
+};
+use iced::{
+    Element, Length, Padding, Task, Theme,
     alignment::{Horizontal, Vertical},
-    widget::{Container, Sensor, Text, TextInput, button, column, focus_next, text_input},
+    widget::{Container, Sensor, Text, TextInput, column, focus_next, text_input},
     window::Id
 };
 use iced_sessionlock::{actions::UnLockAction, application};
