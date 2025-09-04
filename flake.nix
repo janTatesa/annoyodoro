@@ -54,7 +54,11 @@
           {
             inherit name;
             src = pkgs.lib.cleanSource ./.;
-            env.ICED_BACKEND = "wgpu";
+            env = {
+              ICED_BACKEND = "wgpu";
+              LUCIDE_PATH = "${pkgs.lucide}/share/fonts/truetype/Lucide.ttf";
+            };
+
             buildInputs = pkgs.deps;
             nativeBuildInputs = [ pkgs.pkg-config ];
             cargoLock = {
@@ -99,6 +103,7 @@
               ICED_BACKEND = "wgpu";
               RUST_BACKTRACE = 1;
               RUSTFLAGS = "-C link-arg=-Wl,-rpath,${pkgs.lib.makeLibraryPath pkgs.deps}";
+              LUCIDE_PATH = "${pkgs.lucide}/share/fonts/truetype/Lucide.ttf";
             };
           };
         }
