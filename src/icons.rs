@@ -5,7 +5,7 @@ use iced::{
 
 pub static ICON_FONT: &[u8] = include_bytes!(env!("LUCIDE_PATH"));
 
-macro_rules! icon {
+macro_rules! icon_button {
     ($name:ident = $icon:literal) => {
         pub fn $name<'a, T>(size: impl Into<Pixels>) -> Button<'a, T> {
             button(
@@ -32,6 +32,6 @@ macro_rules! icon {
     };
 }
 
-// https://unpkg.com/lucide-static@0.541.0/font/info.json
-icon!(pause_button = '\u{e132}');
-icon!(resume_button = '\u{e140}');
+// https://unpkg.com/lucide-static@latest/font/info.json
+icon_button!(pause_button = '\u{e12e}');
+icon_button!(resume_button = '\u{e13c}');

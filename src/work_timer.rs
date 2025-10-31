@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone, Copy)]
 pub struct WorkTimer {
     last_tick: Option<Instant>,
     work_duration_remaining: Duration

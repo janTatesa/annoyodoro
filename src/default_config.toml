@@ -7,7 +7,8 @@ accent = "#cba6f7"
 danger = "#f38ba8"
 
 [pomodoro]
-break_duration = 5
-work_duration = 20
-long_break_duration = 25
+break_duration.mins = 5
+work_duration.mins = 20
+long_break_duration.mins = 25
 long_break_each = 4
+notification_duration.secs = 30

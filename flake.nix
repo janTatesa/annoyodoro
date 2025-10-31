@@ -44,48 +44,43 @@
               };
             }
           );
-
-      package =
-        pkgs: name: description:
-        (pkgs.makeRustPlatform {
-          rustc = pkgs.rustToolchain;
-          cargo = pkgs.rustToolchain;
-        }).buildRustPackage
-          {
-            inherit name;
-            src = pkgs.lib.cleanSource ./.;
-            env = {
-              ICED_BACKEND = "wgpu";
-              LUCIDE_PATH = "${pkgs.lucide}/share/fonts/truetype/Lucide.ttf";
-            };
-
-            buildInputs = pkgs.deps;
-            nativeBuildInputs = [ pkgs.pkg-config ];
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-              allowBuiltinFetchGit = true;
-            };
-
-            postFixup = ''
-              rpath=$(patchelf --print-rpath $out/bin/${name})
-              patchelf --set-rpath "$rpath:${pkgs.lib.makeLibraryPath pkgs.deps}" $out/bin/${name}
-            '';
-
-            meta = {
-              inherit description;
-              homepage = "https://github.com/janTatesa/annoyodoro";
-              license = pkgs.lib.licenses.mit;
-              mainProgram = name;
-            };
-          };
     in
     {
       packages = forEachSupportedSystem (
         { pkgs }:
-        rec {
-          default = annoyodoro;
-          annoyodoro = package pkgs "annoyodoro" "Annoying pomodoro timer";
-          annoyodoro-break-timer = package pkgs "annoyodoro-break-timer" "Break timer for annoyodoro";
+        {
+          default =
+            (pkgs.makeRustPlatform {
+              rustc = pkgs.rustToolchain;
+              cargo = pkgs.rustToolchain;
+            }).buildRustPackage
+              rec {
+                name = "annoyodoro";
+                src = pkgs.lib.cleanSource ./.;
+                env = {
+                  ICED_BACKEND = "wgpu";
+                  LUCIDE_PATH = "${pkgs.lucide}/share/fonts/truetype/Lucide.ttf";
+                };
+
+                buildInputs = pkgs.deps;
+                nativeBuildInputs = [ pkgs.pkg-config ];
+                cargoLock = {
+                  lockFile = ./Cargo.lock;
+                  allowBuiltinFetchGit = true;
+                };
+
+                postFixup = ''
+                  rpath=$(patchelf --print-rpath $out/bin/${name})
+                  patchelf --set-rpath "$rpath:${pkgs.lib.makeLibraryPath pkgs.deps}" $out/bin/${name}
+                '';
+
+                meta = {
+                  description = "An annoying pomodoro timer";
+                  homepage = "https://github.com/janTatesa/annoyodoro";
+                  license = pkgs.lib.licenses.mit;
+                  mainProgram = name;
+                };
+              };
         }
       );
 

@@ -36,15 +36,27 @@ pub struct PomodoroConfig {
     pub work_duration: Duration,
     #[serde(deserialize_with = "deserialize_duration")]
     pub long_break_duration: Duration,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub notification_duration: Duration,
     pub long_break_each: NonZero<u16>
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SecsAndMins {
+    #[serde(default)]
+    mins: u64,
+    #[serde(default)]
+    secs: u64
 }
 
 fn deserialize_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>
 {
-    let mins = u64::deserialize(deserializer)?;
-    Ok(Duration::from_secs(mins * 60))
+    let secs_and_mins = SecsAndMins::deserialize(deserializer)?;
+    let secs = secs_and_mins.secs + secs_and_mins.mins * 60;
+    Ok(Duration::from_secs(secs))
 }
 
 #[derive(Deserialize, Clone, Copy)]

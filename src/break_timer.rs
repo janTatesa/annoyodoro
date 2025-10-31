@@ -6,20 +6,19 @@ use std::{
 
 use color_eyre::Result;
 #[cfg(debug_assertions)]
-use iced::{
-    Border,
-    widget::{Button, button}
-};
+use iced::widget::{button, text};
 use iced::{
     Element, Length, Padding, Task, Theme,
     alignment::{Horizontal, Vertical},
-    widget::{Container, Sensor, Text, TextInput, column, focus_next, text_input},
+    widget::{column, container, focus_next, sensor, text_input},
     window::Id
 };
 use iced_sessionlock::{actions::UnLockAction, application};
-use time::Duration;
+use jiff::SignedDuration;
 
-use crate::{BORDER_RADIUS, HumanReadableDuration, config::Config};
+#[cfg(debug_assertions)]
+use crate::button_style;
+use crate::{Annoyodoro, HumanReadableDuration, config::Config, text_input_style};
 
 #[derive(Clone)]
 pub struct BreakTimer {
@@ -27,7 +26,7 @@ pub struct BreakTimer {
     work_goal_tx: SyncSender<String>,
     last_tick: Instant,
     long_break: bool,
-    break_duration_left: Duration,
+    break_duration_left: SignedDuration,
     work_goal: String,
     theme: Theme
 }
@@ -71,11 +70,11 @@ impl BreakTimer {
 
 #[derive(Debug, Clone)]
 enum Message {
+    StartupFocus,
     Exit,
     ContinueWorking,
     WorkGoalChange(String),
-    Tick(Instant),
-    StartupFocus
+    Tick(Instant)
 }
 
 impl TryInto<UnLockAction> for Message {
@@ -100,7 +99,7 @@ impl BreakTimer {
             }
             Message::ContinueWorking => Task::none(),
             Message::Tick(now) => {
-                self.break_duration_left -= now.duration_since(self.last_tick);
+                self.break_duration_left -= now.duration_since(self.last_tick).try_into().unwrap();
                 self.last_tick = now;
                 Task::none()
             }
@@ -117,7 +116,7 @@ impl BreakTimer {
     }
 
     fn view(&self, _: Id) -> Element<'_, Message> {
-        let (title_text, timer_color) = if self.break_duration_left <= Duration::ZERO {
+        let (title_text, timer_color) = if self.break_duration_left <= SignedDuration::ZERO {
             (
                 "Time to work! (submit your work reason)",
                 self.theme.palette().danger
@@ -132,56 +131,43 @@ impl BreakTimer {
         let on_submit =
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
-        let column = column![
-            Text::new(title_text).size(80),
-            Text::new(time_left).color(timer_color).size(120),
-            Container::new(
-                TextInput::new("Enter the goal of the next work session", &self.work_goal)
-                    .size(40)
-                    .on_input(Message::WorkGoalChange)
-                    .on_submit_maybe(on_submit)
-                    .style(|theme: &Theme, status| {
-                        let mut style = text_input::default(theme, status);
-                        style.border.width = 4.;
-                        style.border.radius = BORDER_RADIUS;
-                        if let text_input::Status::Focused { .. } = status {
-                            style.border.color = theme.palette().primary
-                        }
+        let text_input = text_input("Enter the goal of the next work session", &self.work_goal)
+            .size(Annoyodoro::TEXT_SIZE / 2)
+            .on_input(Message::WorkGoalChange)
+            .on_submit_maybe(on_submit)
+            .style(text_input_style);
 
-                        style
-                    })
-            )
-            .padding(Padding::default().left(240).right(240)),
+        let text_input_padding = Padding::default()
+            .left(Annoyodoro::TIMER_SIZE * 2)
+            .right(Annoyodoro::TIMER_SIZE * 2);
+
+        let column = column![
+            text(title_text).size(Annoyodoro::TEXT_SIZE),
+            text(time_left)
+                .color(timer_color)
+                .size(Annoyodoro::TIMER_SIZE),
+            container(text_input).padding(text_input_padding),
         ]
         .align_x(Horizontal::Center)
         .spacing(20);
 
         #[cfg(debug_assertions)]
         let column = column.push(
-            Button::new(Text::new("Skip break button (enabled only when debugging)").size(40))
-                .style(|theme: &Theme, status| {
-                    let base = button::primary(theme, status);
-                    button::Style {
-                        border: Border {
-                            radius: BORDER_RADIUS,
-                            ..base.border
-                        },
-                        ..base
-                    }
-                })
-                .on_press(Message::ContinueWorking)
+            button(
+                text("Skip break button (enabled only when debugging)").size(Annoyodoro::TEXT_SIZE)
+            )
+            .style(button_style)
+            .on_press(Message::ContinueWorking)
         );
 
-        let container = Container::new(column)
+        let container = container(column)
             .align_x(Horizontal::Center)
             .align_y(Vertical::Center)
             .width(Length::Fill)
             .height(Length::Fill);
 
         if self.needs_startup_focus {
-            return Sensor::new(container)
-                .on_show(|_| Message::StartupFocus)
-                .into();
+            return sensor(container).on_show(|_| Message::StartupFocus).into();
         }
 
         container.into()
