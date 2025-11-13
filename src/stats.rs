@@ -101,7 +101,7 @@ impl StatsManager {
         path.push("annoyodoro");
         fs::create_dir_all(&path)?;
         path.push("stats.bin");
-        Ok(data_dir)
+        Ok(path)
     }
 
     #[cfg(debug_assertions)]

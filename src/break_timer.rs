@@ -5,12 +5,10 @@ use std::{
 };
 
 use color_eyre::Result;
-#[cfg(debug_assertions)]
-use iced::widget::{button, text};
 use iced::{
     Element, Length, Padding, Task, Theme,
     alignment::{Horizontal, Vertical},
-    widget::{column, container, focus_next, sensor, text_input},
+    widget::{button, column, container, focus_next, sensor, text, text_input},
     window::Id
 };
 use iced_sessionlock::{actions::UnLockAction, application};

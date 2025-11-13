@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), allow(unused_imports))]
+
 mod break_timer;
 mod cli;
 mod config;
@@ -17,8 +19,6 @@ use clap::Parser;
 use cli::Cli;
 use color_eyre::{Result, eyre::Report};
 use config::Config;
-#[cfg(debug_assertions)]
-use iced::widget::button;
 use iced::{
     Alignment::Center,
     Element, Event,
@@ -30,7 +30,7 @@ use iced::{
     keyboard::{self, Key, key::Named},
     never,
     widget::{
-        Container, Sensor, checkbox, column, focus_next, rich_text, row, span, text,
+        Container, Sensor, button, checkbox, column, focus_next, rich_text, row, span, text,
         text::{Fragment, IntoFragment},
         text_input
     },
@@ -162,13 +162,19 @@ impl Annoyodoro {
                 }
             ) => {
                 work_timer.on_tick();
-                if work_timer.duration_remaning() <= self.config.pomodoro.notification_duration
+                let duration_remaning = work_timer.duration_remaning();
+                if duration_remaning <= self.config.pomodoro.notification_duration
                     && !*shown_notification
                 {
                     *shown_notification = true;
+                    let body = format!(
+                        "Next break in {}:{:02}",
+                        duration_remaning.as_secs() / 60,
+                        duration_remaning.as_secs() % 60
+                    );
                     Notification::new()
                         .summary("Annoyodoro")
-                        .body("Next break!")
+                        .body(body.as_str())
                         .show()?;
                 }
 
