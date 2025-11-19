@@ -13,6 +13,7 @@ use iced::{
 };
 use iced_sessionlock::{actions::UnLockAction, application};
 use jiff::SignedDuration;
+use mpris::{PlaybackStatus, PlayerFinder};
 
 #[cfg(debug_assertions)]
 use crate::button_style;
@@ -31,6 +32,12 @@ pub struct BreakTimer {
 
 impl BreakTimer {
     pub fn spawn(long_break: bool, config: Config) -> Result<String> {
+        let player = PlayerFinder::new()?.find_active()?;
+        let was_playing_before_break = player.get_playback_status()? == PlaybackStatus::Playing;
+        if was_playing_before_break {
+            player.pause()?
+        }
+
         let duration = if long_break {
             config.pomodoro.long_break_duration
         } else {
@@ -61,6 +68,10 @@ impl BreakTimer {
         let work_goal = work_goal_rx
             .try_recv()
             .expect("Work goal should have been sent");
+
+        if was_playing_before_break {
+            player.play()?
+        }
 
         Ok(work_goal)
     }
@@ -130,7 +141,7 @@ impl BreakTimer {
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
         let text_input = text_input("Enter the goal of the next work session", &self.work_goal)
-            .size(Annoyodoro::TEXT_SIZE / 2)
+            .size(Annoyodoro::TEXT_SIZE)
             .on_input(Message::WorkGoalChange)
             .on_submit_maybe(on_submit)
             .style(text_input_style);

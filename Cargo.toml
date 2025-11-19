@@ -26,3 +26,4 @@ iced_sessionlock.git = "https://github.com/waycrate/exwlshelleventloop/"
 smol = "2.0.2"
 jiff = { version = "0.2.15", features = ["serde"] }
 notify-rust = "4.11.7"
+mpris = "2.0.1"

@@ -92,6 +92,7 @@
               pkg-config
               rustfmt
               rustToolchain
+              dbus
             ];
 
             env = {
