@@ -62,7 +62,10 @@
                   LUCIDE_PATH = "${pkgs.lucide}/share/fonts/truetype/Lucide.ttf";
                 };
 
-                buildInputs = pkgs.deps;
+                buildInputs = [
+                  pkgs.deps
+                  pkgs.dbus
+                ];
                 nativeBuildInputs = [ pkgs.pkg-config ];
                 cargoLock = {
                   lockFile = ./Cargo.lock;
