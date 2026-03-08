@@ -3,47 +3,35 @@
 mod break_timer;
 mod cli;
 mod config;
-mod icons;
 mod stats;
 mod work_timer;
 
-use std::{
-    cell::RefCell,
-    mem,
-    sync::mpsc::{self, Sender},
-    time::Duration
-};
+use std::{cell::RefCell, mem, time::Duration};
 
 use break_timer::BreakTimer;
 use clap::Parser;
 use cli::Cli;
-use color_eyre::{Result, eyre::Report};
 use config::Config;
 use iced::{
     Alignment::Center,
-    Element, Event,
+    Element, Event, Font,
     Length::Fill,
-    Subscription, Task, Theme,
-    border::Radius,
+    Subscription, Task,
     event::{self, Status},
     exit,
     keyboard::{self, Key, key::Named},
     never,
-    widget::{
-        Container, Sensor, button, checkbox, column, focus_next, rich_text, row, span, text,
-        text::{Fragment, IntoFragment},
-        text_input
-    },
+    widget::{self, Container, Sensor, button, column, operation::focus, rich_text, row, span},
     window::Id
 };
-use icons::{ICON_FONT, pause_button, resume_button};
 use jiff::SignedDuration;
+use lucide_icons::{Icon, LUCIDE_FONT_BYTES};
 use notify_rust::Notification;
 use stats::StatsManager;
 use work_timer::WorkTimer;
+use yanet::Result;
 
 fn main() -> Result<()> {
-    color_eyre::install()?;
     let cli = Cli::parse();
 
     if cli.print_default_config {
@@ -59,21 +47,15 @@ fn main() -> Result<()> {
     let default_font = config.font;
     let theme = config.theme();
     let stats = StatsManager::load()?;
-
-    let (tx, rx) = mpsc::channel();
-    let once_boot = RefCell::new(Some(Annoyodoro::new(config, stats, tx)));
+    let once_boot = RefCell::new(Some(Annoyodoro::new(config, stats)));
     let boot = move || (once_boot.borrow_mut().take().unwrap(), Task::none());
 
     iced::application(boot, Annoyodoro::update, Annoyodoro::view)
         .subscription(Annoyodoro::subscription)
         .default_font(default_font)
-        .font(ICON_FONT)
-        .theme(move |_| theme.clone())
+        .font(LUCIDE_FONT_BYTES)
+        .theme(move |_: &Annoyodoro| theme.clone())
         .run()?;
-
-    if let Ok(report) = rx.try_recv() {
-        return Err(report)
-    }
 
     Ok(())
 }
@@ -81,8 +63,7 @@ fn main() -> Result<()> {
 struct Annoyodoro {
     config: Config,
     stats: StatsManager,
-    state: AppState,
-    error_tx: Sender<Report>
+    state: AppState
 }
 
 #[derive(Debug)]
@@ -113,14 +94,15 @@ enum Message {
     DebugEarlyBreak
 }
 
+const SPACING: u16 = 5;
+const TIMER_SIZE: u32 = 120;
+
 impl Annoyodoro {
-    fn new(config: Config, stats: StatsManager, error_tx: Sender<Report>) -> Self {
+    fn new(config: Config, stats: StatsManager) -> Self {
         Annoyodoro {
             config,
             stats,
-
-            state: AppState::Startup,
-            error_tx
+            state: AppState::Startup
         }
     }
 
@@ -139,8 +121,8 @@ impl Annoyodoro {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         self.try_update(message).unwrap_or_else(|err| {
-            self.error_tx.send(err).unwrap();
-            exit()
+            dbg!(err);
+            Task::none()
         })
     }
 
@@ -150,7 +132,7 @@ impl Annoyodoro {
                 self.state = AppState::InitialWorkGoalPrompt {
                     goal: String::new()
                 };
-                return Ok(focus_next())
+                return Ok(focus("work-goal"))
             }
             (
                 Message::Tick,
@@ -285,10 +267,6 @@ impl Annoyodoro {
         }
     }
 
-    const SPACING: u16 = 20;
-    const PAUSE_BUTTON_SIZE: u32 = (Self::TIMER_SIZE / 3) * 2;
-    const TIMER_SIZE: u32 = 120;
-    const TEXT_SIZE: u32 = Self::TIMER_SIZE / 3;
     fn view(&self) -> Element<'_, Message> {
         match self.state {
             AppState::Running { work_timer, .. } if work_timer.duration_remaning().is_zero() => {
@@ -318,51 +296,55 @@ impl Annoyodoro {
             .duration_remaning()
             .try_into()
             .unwrap_or(SignedDuration::MAX);
-        let time_left = text(HumanReadableDuration(time_left))
-            .size(Self::TIMER_SIZE)
-            .color(palette.primary);
+        let time_left = rich_text![
+            span(time_left.as_mins().to_string()).color(palette.primary),
+            span(":").color(
+                self.config
+                    .theme()
+                    .extended_palette()
+                    .background
+                    .strong
+                    .color
+            ),
+            span(format!("{:02}", time_left.as_secs().abs() % 60)).color(palette.primary)
+        ]
+        .on_link_click(never)
+        .size(TIMER_SIZE);
         let toggle_pause_button = if work_timer.is_paused() {
-            resume_button(Self::PAUSE_BUTTON_SIZE)
+            button(widget::text(Icon::Play.unicode()).font(Font::with_name("lucide")))
         } else {
-            pause_button(Self::PAUSE_BUTTON_SIZE)
+            button(widget::text(Icon::Pause.unicode()).font(Font::with_name("lucide")))
         }
         .on_press(Message::TogglePause);
 
         let timer_row = row![time_left, toggle_pause_button]
             .align_y(Center)
-            .spacing(Self::SPACING as u32);
+            .spacing(SPACING as u32);
         let column = column![
             timer_row,
-            checkbox("Last work session", last_work_session)
-                .style(|theme, status| {
-                    let mut style = checkbox::primary(theme, status);
-                    style.border.width = BORDER_WIDTH;
-                    style.border.radius = BORDER_RADIUS;
-                    style
-                })
+            widget::checkbox(last_work_session)
                 .on_toggle(|_| Message::ToggleLastWorkSession)
-                .size(Self::TEXT_SIZE)
-                .text_size(Self::TEXT_SIZE),
+                .label("Last work session"),
             rich_text![
                 "Next long break in ",
                 span(long_break_in.to_string()).color(palette.primary),
                 " pomodori"
             ]
-            .on_link_click(never)
-            .size(Self::TEXT_SIZE),
+            .on_link_click(never),
             rich_text![
                 "Pomodori today: ",
                 span(self.stats.pomodori_daily().to_string()).color(palette.primary)
             ]
-            .on_link_click(never)
-            .size(Self::TEXT_SIZE)
+            .on_link_click(never),
+            widget::text!(
+                "Current work goal: {}",
+                self.stats.work_goals().last().unwrap().1
+            )
         ]
         .align_x(Center);
         #[cfg(debug_assertions)]
         let column = column.push(
-            button(text("Early break (enabled only in debug mode)").size(Self::TEXT_SIZE))
-                .style(button_style)
-                .on_press(Message::DebugEarlyBreak)
+            button("Early break (enabled only in debug mode)").on_press(Message::DebugEarlyBreak)
         );
         Container::new(column)
             .align_x(Center)
@@ -373,58 +355,16 @@ impl Annoyodoro {
     }
 
     fn initial_work_goal_prompt<'a>(work_goal: &str) -> Element<'a, Message> {
-        let text_input = text_input("Enter the goal of the first work session", work_goal)
-            .size(Self::TEXT_SIZE)
-            .style(text_input_style)
+        let text_input = widget::text_input("Enter the goal of the first work session", work_goal)
+            .id("work-goal")
             .on_input(Message::InitialWorkGoalChange)
             .on_submit(Message::InitialWorkGoalSubmit);
         Container::new(text_input)
-            .padding(Self::SPACING)
+            .padding(SPACING)
             .align_x(Center)
             .align_y(Center)
             .width(Fill)
             .height(Fill)
             .into()
     }
-}
-
-struct HumanReadableDuration(pub SignedDuration);
-impl IntoFragment<'static> for HumanReadableDuration {
-    fn into_fragment(self) -> Fragment<'static> {
-        let sign = if self.0.is_negative() {
-            "-"
-        } else {
-            Default::default()
-        };
-
-        let mins = self.0.as_secs().abs() / 60;
-        let secs = self.0.as_secs().abs() % 60;
-        Fragment::Owned(format!("{sign}{mins}:{secs:02}"))
-    }
-}
-
-const BORDER_RADIUS: Radius = Radius {
-    top_left: 10.,
-    top_right: 10.,
-    bottom_right: 10.,
-    bottom_left: 10.
-};
-
-const BORDER_WIDTH: f32 = 4.;
-
-fn button_style(theme: &Theme, status: button::Status) -> button::Style {
-    let mut style = button::primary(theme, status);
-    style.border.radius = BORDER_RADIUS;
-    style
-}
-
-fn text_input_style(theme: &Theme, status: text_input::Status) -> text_input::Style {
-    let mut style = text_input::default(theme, status);
-    style.border.width = BORDER_WIDTH;
-    style.border.radius = BORDER_RADIUS;
-    if let text_input::Status::Focused { .. } = status {
-        style.border.color = theme.palette().primary
-    }
-
-    style
 }

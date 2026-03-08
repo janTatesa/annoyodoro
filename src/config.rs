@@ -1,14 +1,12 @@
 use std::{fs, num::NonZero, path::PathBuf, time::Duration};
 
-#[cfg(not(debug_assertions))]
-use color_eyre::eyre::ContextCompat;
-use color_eyre::{eyre::Result, owo_colors::OwoColorize};
 use figment::{
     Figment,
     providers::{Data, Toml}
 };
 use iced::{Color, Font, Theme, theme::Palette};
 use serde::{Deserialize, Deserializer, de::Error};
+use yanet::Result;
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -111,7 +109,7 @@ impl Config {
     pub fn write_default() -> Result<()> {
         let path = Self::path()?;
         fs::write(&path, Self::DEFAULT)?;
-        println!("Wrote default config to {}", path.display().green());
+        println!("Wrote default config to {}", path.display());
         Ok(())
     }
 

@@ -4,20 +4,21 @@ use std::{
     time::Instant
 };
 
-use color_eyre::Result;
 use iced::{
     Element, Length, Padding, Task, Theme,
     alignment::{Horizontal, Vertical},
-    widget::{button, column, container, focus_next, sensor, text, text_input},
+    never,
+    widget::{
+        button, column, container, operation::focus_next, rich_text, sensor, span, text_input
+    },
     window::Id
 };
 use iced_sessionlock::{actions::UnLockAction, application};
 use jiff::SignedDuration;
 use mpris::{PlaybackStatus, PlayerFinder};
+use yanet::Result;
 
-#[cfg(debug_assertions)]
-use crate::button_style;
-use crate::{Annoyodoro, HumanReadableDuration, config::Config, text_input_style};
+use crate::{TIMER_SIZE, config::Config};
 
 #[derive(Clone)]
 pub struct BreakTimer {
@@ -61,7 +62,7 @@ impl BreakTimer {
             BreakTimer::view
         )
         .default_font(config.font)
-        .theme(move |_, _| config.theme())
+        .theme(|app: &BreakTimer| app.theme.clone())
         .subscription(|_| iced::time::every(iced::time::Duration::from_secs(1)).map(Message::Tick))
         .run()?;
 
@@ -125,48 +126,45 @@ impl BreakTimer {
     }
 
     fn view(&self, _: Id) -> Element<'_, Message> {
+        let palette = self.theme.palette();
         let (title_text, timer_color) = if self.break_duration_left <= SignedDuration::ZERO {
-            (
-                "Time to work! (submit your work reason)",
-                self.theme.palette().danger
-            )
+            ("Time to work! (submit your work reason)", palette.danger)
         } else if self.long_break {
-            ("Time for a long break", self.theme.palette().primary)
+            ("Time for a long break", palette.primary)
         } else {
-            ("Time for a break!", self.theme.palette().primary)
+            ("Time for a break!", palette.primary)
         };
 
-        let time_left = HumanReadableDuration(self.break_duration_left);
+        let time_left = self.break_duration_left;
         let on_submit =
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
         let text_input = text_input("Enter the goal of the next work session", &self.work_goal)
-            .size(Annoyodoro::TEXT_SIZE)
             .on_input(Message::WorkGoalChange)
-            .on_submit_maybe(on_submit)
-            .style(text_input_style);
+            .on_submit_maybe(on_submit);
 
         let text_input_padding = Padding::default()
-            .left(Annoyodoro::TIMER_SIZE * 2)
-            .right(Annoyodoro::TIMER_SIZE * 2);
+            .left(TIMER_SIZE * 2)
+            .right(TIMER_SIZE * 2);
 
         let column = column![
-            text(title_text).size(Annoyodoro::TEXT_SIZE),
-            text(time_left)
-                .color(timer_color)
-                .size(Annoyodoro::TIMER_SIZE),
-            container(text_input).padding(text_input_padding),
+            title_text,
+            rich_text![
+                span(time_left.as_mins().to_string()).color(timer_color),
+                span(":"),
+                span(format!("{:02}", time_left.as_secs().abs() % 60)).color(timer_color)
+            ]
+            .on_link_click(never)
+            .size(TIMER_SIZE),
+            text_input.padding(text_input_padding),
         ]
         .align_x(Horizontal::Center)
         .spacing(20);
 
         #[cfg(debug_assertions)]
         let column = column.push(
-            button(
-                text("Skip break button (enabled only when debugging)").size(Annoyodoro::TEXT_SIZE)
-            )
-            .style(button_style)
-            .on_press(Message::ContinueWorking)
+            button("Skip break button (enabled only when debugging)")
+                .on_press(Message::ContinueWorking)
         );
 
         let container = container(column)

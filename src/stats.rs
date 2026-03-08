@@ -2,14 +2,12 @@
 use std::{collections::BTreeMap, fs, fs::File, io::BufWriter, path::PathBuf};
 
 use bincode::{Decode, Encode, decode_from_slice, encode_into_std_write};
-#[cfg(not(debug_assertions))]
-use color_eyre::eyre::OptionExt;
-use color_eyre::eyre::{Context, Result};
 use jiff::{
     Zoned,
     civil::{Date, DateTime}
 };
 use serde::{Deserialize, Serialize};
+use yanet::{Result, ResultExt};
 
 pub struct StatsManager {
     current_date: Date,
@@ -123,12 +121,12 @@ impl StatsManager {
         }
 
         let bytes =
-            fs::read(&path).wrap_err_with(|| format!("Cannot open {}", path.to_string_lossy()))?;
+            fs::read(&path).wrap_err_with(|_| format!("Cannot open {}", path.to_string_lossy()))?;
 
         Ok(Self {
             current_date,
             stats: decode_from_slice(&bytes, bincode::config::standard())
-                .wrap_err_with(|| format!("Cannot decode {}", path.to_string_lossy()))?
+                .wrap_err_with(|_| format!("Cannot decode {}", path.to_string_lossy()))?
                 .0
         })
     }
@@ -136,7 +134,7 @@ impl StatsManager {
     pub fn save(&self) -> Result<()> {
         let path = Self::path()?;
         let file = File::create(&path)
-            .wrap_err_with(|| format!("Cannot open {}", path.to_string_lossy()))?;
+            .wrap_err_with(|_| format!("Cannot open {}", path.to_string_lossy()))?;
         let mut writer = BufWriter::new(file);
 
         encode_into_std_write(&self.stats, &mut writer, bincode::config::standard())?;
@@ -165,6 +163,10 @@ impl StatsManager {
 
     pub fn add_work_goal(&mut self, goal: String) {
         self.stats.work_goals.push((Zoned::now().datetime(), goal))
+    }
+
+    pub fn work_goals(&self) -> &[(DateTime, String)] {
+        &self.stats.work_goals
     }
 
     pub fn reload_if_needed(&mut self) -> Result<()> {

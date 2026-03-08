@@ -13,7 +13,6 @@ categories = []
 
 
 [dependencies]
-color-eyre = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 dirs = "6.0"
 clap = { version = "4.5", features = ["cargo", "derive", "string"] }
@@ -21,9 +20,18 @@ figment = { version = "0.10", features = ["toml"] }
 csscolorparser = "0.7"
 bincode = { version = "2.0", features = ["serde"] }
 itertools = "0.14"
-iced = { git = "https://github.com/iced-rs/iced", features = ["smol"] }
-iced_sessionlock.git = "https://github.com/waycrate/exwlshelleventloop/"
+iced = { version = "0.14", features = [
+  "smol",
+  "wgpu",
+  "crisp",
+  "wayland",
+  "smol",
+], default-features = false }
 smol = "2.0.2"
 jiff = { version = "0.2.15", features = ["serde"] }
 notify-rust = "4.11.7"
 mpris = "2.0.1"
+lucide-icons = "0.575.0"
+iced_sessionlock = "0.15.0"
+hyozu = { git = "https://github.com/airstrike/hyozu", version = "0.1.0", branch = "0.14" }
+yanet = { git = "https://github.com/janTatesa/yanet", version = "0.1.0", features = ["colors"] }
