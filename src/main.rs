@@ -13,15 +13,14 @@ use clap::Parser;
 use cli::Cli;
 use config::Config;
 use iced::{
-    Alignment::Center,
-    Element, Event, Font,
-    Length::Fill,
-    Subscription, Task,
+    Alignment, Element, Event, Font, Length, Subscription, Task,
     event::{self, Status},
     exit,
     keyboard::{self, Key, key::Named},
     never,
-    widget::{self, Container, Sensor, button, column, operation::focus, rich_text, row, span},
+    widget::{
+        self, Container, button, column, container, operation::focus, rich_text, row, span, text
+    },
     window::Id
 };
 use jiff::SignedDuration;
@@ -63,12 +62,12 @@ fn main() -> Result<()> {
 struct Annoyodoro {
     config: Config,
     stats: StatsManager,
-    state: AppState
+    state: AppState,
+    error: Option<String>
 }
 
 #[derive(Debug)]
 enum AppState {
-    Startup,
     InitialWorkGoalPrompt {
         goal: String
     },
@@ -82,7 +81,6 @@ enum AppState {
 
 #[derive(Debug, Clone)]
 enum Message {
-    StartupFocus,
     InitialWorkGoalChange(String),
     InitialWorkGoalSubmit,
 
@@ -94,15 +92,18 @@ enum Message {
     DebugEarlyBreak
 }
 
-const SPACING: u16 = 5;
-const TIMER_SIZE: u32 = 120;
+const SPACING: f32 = 5.0;
+const TIMER_SIZE: f32 = 120.0;
 
 impl Annoyodoro {
     fn new(config: Config, stats: StatsManager) -> Self {
         Annoyodoro {
             config,
             stats,
-            state: AppState::Startup
+            state: AppState::InitialWorkGoalPrompt {
+                goal: String::new()
+            },
+            error: None
         }
     }
 
@@ -121,19 +122,14 @@ impl Annoyodoro {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         self.try_update(message).unwrap_or_else(|err| {
-            dbg!(err);
+            dbg!(&err);
+            self.error = Some(err.to_string());
             Task::none()
         })
     }
 
     fn try_update(&mut self, message: Message) -> Result<Task<Message>> {
         match (message, &mut self.state) {
-            (Message::StartupFocus, _) => {
-                self.state = AppState::InitialWorkGoalPrompt {
-                    goal: String::new()
-                };
-                return Ok(focus("work-goal"))
-            }
             (
                 Message::Tick,
                 AppState::Running {
@@ -217,24 +213,20 @@ impl Annoyodoro {
                 self.stats.save()?;
                 self.stats.reload_if_needed()?;
             }
-            (Message::InitialWorkGoalChange(_), _) => panic!(),
             (
                 Message::ToggleLastWorkSession,
                 AppState::Running {
                     last_work_session, ..
                 }
             ) => *last_work_session = !*last_work_session,
-            (Message::InitialWorkGoalSubmit, AppState::Startup)
-            | (Message::InitialWorkGoalSubmit, AppState::Running { .. })
-            | (Message::TogglePause, AppState::Startup)
-            | (Message::TogglePause, AppState::InitialWorkGoalPrompt { .. })
-            | (Message::ToggleLastWorkSession, AppState::Startup)
-            | (Message::ToggleLastWorkSession, AppState::InitialWorkGoalPrompt { .. })
-            | (Message::Tick, AppState::Startup)
-            | (Message::Tick, AppState::InitialWorkGoalPrompt { .. }) => panic!()
+            (Message::InitialWorkGoalChange(_), AppState::Running { .. }) => {}
+            (Message::InitialWorkGoalSubmit, AppState::Running { .. }) => {}
+            (Message::TogglePause, AppState::InitialWorkGoalPrompt { .. }) => {}
+            (Message::ToggleLastWorkSession, AppState::InitialWorkGoalPrompt { .. }) => {}
+            (Message::Tick, AppState::InitialWorkGoalPrompt { .. }) => {}
         }
 
-        Ok(Task::none())
+        Ok(focus("work-goal"))
     }
 
     fn key_subscription(event: Event, _: Status, _: Id) -> Option<Message> {
@@ -254,7 +246,7 @@ impl Annoyodoro {
 
     fn subscription(&self) -> Subscription<Message> {
         match &self.state {
-            AppState::InitialWorkGoalPrompt { .. } | AppState::Startup => Subscription::none(),
+            AppState::InitialWorkGoalPrompt { .. } => Subscription::none(),
             AppState::Running { work_timer, .. }
                 if !work_timer.is_paused() && !work_timer.duration_remaning().is_zero() =>
             {
@@ -278,10 +270,7 @@ impl Annoyodoro {
                 last_work_session,
                 ..
             } => self.main_view(long_break_in, work_timer, last_work_session),
-            AppState::InitialWorkGoalPrompt { ref goal } => Self::initial_work_goal_prompt(goal),
-            AppState::Startup => Sensor::new(Self::initial_work_goal_prompt(""))
-                .on_show(|_| Message::StartupFocus)
-                .into()
+            AppState::InitialWorkGoalPrompt { ref goal } => Self::initial_work_goal_prompt(goal)
         }
     }
 
@@ -318,53 +307,56 @@ impl Annoyodoro {
         .on_press(Message::TogglePause);
 
         let timer_row = row![time_left, toggle_pause_button]
-            .align_y(Center)
-            .spacing(SPACING as u32);
+            .align_y(Alignment::Center)
+            .spacing(SPACING);
+
         let column = column![
             timer_row,
             widget::checkbox(last_work_session)
                 .on_toggle(|_| Message::ToggleLastWorkSession)
                 .label("Last work session"),
-            rich_text![
-                "Next long break in ",
-                span(long_break_in.to_string()).color(palette.primary),
-                " pomodori"
-            ]
-            .on_link_click(never),
-            rich_text![
-                "Pomodori today: ",
-                span(self.stats.pomodori_daily().to_string()).color(palette.primary)
-            ]
-            .on_link_click(never),
-            widget::text!(
-                "Current work goal: {}",
-                self.stats.work_goals().last().unwrap().1
-            )
+            row![
+                container("Next long break in").width(Length::Fill),
+                container(text(format!("{long_break_in} pomodori")).color(palette.primary))
+                    .align_right(Length::Fill)
+            ],
+            row![
+                container("Pomodori today").width(Length::Fill),
+                container(text(self.stats.pomodori_daily().to_string()).color(palette.primary))
+                    .align_right(Length::Fill)
+            ],
+            row![
+                "Current work goal",
+                container(self.stats.work_goals().last().unwrap().1.as_str())
+                    .align_right(Length::Fill)
+            ],
+            self.error
+                .as_ref()
+                .map(|e| widget::text(e).style(text::danger)),
         ]
-        .align_x(Center);
+        .max_width(TIMER_SIZE * 4.0)
+        .align_x(Alignment::Center);
         #[cfg(debug_assertions)]
         let column = column.push(
             button("Early break (enabled only in debug mode)").on_press(Message::DebugEarlyBreak)
         );
-        Container::new(column)
-            .align_x(Center)
-            .align_y(Center)
-            .width(Fill)
-            .height(Fill)
-            .into()
+
+        Container::new(column).center(Length::Fill).into()
     }
 
     fn initial_work_goal_prompt<'a>(work_goal: &str) -> Element<'a, Message> {
-        let text_input = widget::text_input("Enter the goal of the first work session", work_goal)
+        let text_input = widget::text_input("Work goal", work_goal)
             .id("work-goal")
             .on_input(Message::InitialWorkGoalChange)
             .on_submit(Message::InitialWorkGoalSubmit);
-        Container::new(text_input)
+        let column = column![
+            container("Enter the goal of your fist work session").center(Length::Fill),
+            text_input
+        ]
+        .max_width(TIMER_SIZE * 3.0);
+        Container::new(column)
             .padding(SPACING)
-            .align_x(Center)
-            .align_y(Center)
-            .width(Fill)
-            .height(Fill)
+            .center(Length::Fill)
             .into()
     }
 }

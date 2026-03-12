@@ -5,15 +5,12 @@ use std::{
 };
 
 use iced::{
-    Element, Length, Padding, Task, Theme,
+    Element, Length, Task, Theme,
     alignment::{Horizontal, Vertical},
-    never,
-    widget::{
-        button, column, container, operation::focus_next, rich_text, sensor, span, text_input
-    },
-    window::Id
+    exit, never,
+    widget::{self, button, column, container, operation::focus, rich_text, span, text_input}
 };
-use iced_sessionlock::{actions::UnLockAction, application};
+use iced_layershell::{application, to_layer_message};
 use jiff::SignedDuration;
 use mpris::{PlaybackStatus, PlayerFinder};
 use yanet::Result;
@@ -22,7 +19,6 @@ use crate::{TIMER_SIZE, config::Config};
 
 #[derive(Clone)]
 pub struct BreakTimer {
-    needs_startup_focus: bool,
     work_goal_tx: SyncSender<String>,
     last_tick: Instant,
     long_break: bool,
@@ -52,12 +48,12 @@ impl BreakTimer {
             break_duration_left: duration.try_into()?,
             theme: config.theme(),
             work_goal_tx,
-            work_goal: String::new(),
-            needs_startup_focus: true
+            work_goal: String::new()
         };
 
         application(
             move || (timer.clone(), Task::none()),
+            "annoyodoro",
             BreakTimer::update,
             BreakTimer::view
         )
@@ -78,24 +74,12 @@ impl BreakTimer {
     }
 }
 
+#[to_layer_message]
 #[derive(Debug, Clone)]
 enum Message {
-    StartupFocus,
-    Exit,
     ContinueWorking,
     WorkGoalChange(String),
     Tick(Instant)
-}
-
-impl TryInto<UnLockAction> for Message {
-    type Error = Self;
-
-    fn try_into(self) -> Result<UnLockAction, Self> {
-        match self {
-            Self::Exit => Ok(UnLockAction),
-            _ => Err(self)
-        }
-    }
 }
 
 impl BreakTimer {
@@ -105,27 +89,29 @@ impl BreakTimer {
                 self.work_goal_tx
                     .send(mem::take(&mut self.work_goal))
                     .unwrap();
-                Task::done(Message::Exit)
+                return exit()
             }
-            Message::ContinueWorking => Task::none(),
+            Message::ContinueWorking => {}
             Message::Tick(now) => {
                 self.break_duration_left -= now.duration_since(self.last_tick).try_into().unwrap();
                 self.last_tick = now;
-                Task::none()
             }
-            Message::WorkGoalChange(goal) => {
-                self.work_goal = goal;
-                Task::none()
-            }
-            Message::Exit => panic!("Iced sessionlock should exit on this action"),
-            Message::StartupFocus => {
-                self.needs_startup_focus = false;
-                focus_next()
-            }
+            Message::WorkGoalChange(goal) => self.work_goal = goal,
+            Message::AnchorChange(_)
+            | Message::SetInputRegion(_)
+            | Message::AnchorSizeChange(..)
+            | Message::LayerChange(_)
+            | Message::MarginChange(_)
+            | Message::SizeChange(_)
+            | Message::ExclusiveZoneChange(_)
+            | Message::KeyboardInteractivityChange(_)
+            | Message::VirtualKeyboardPressed { .. } => {}
         }
+
+        focus("work-goal")
     }
 
-    fn view(&self, _: Id) -> Element<'_, Message> {
+    fn view(&self) -> Element<'_, Message> {
         let palette = self.theme.palette();
         let (title_text, timer_color) = if self.break_duration_left <= SignedDuration::ZERO {
             ("Time to work! (submit your work reason)", palette.danger)
@@ -139,27 +125,25 @@ impl BreakTimer {
         let on_submit =
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
-        let text_input = text_input("Enter the goal of the next work session", &self.work_goal)
+        let text_input = text_input("Work goal", &self.work_goal)
+            .id("work-goal")
             .on_input(Message::WorkGoalChange)
             .on_submit_maybe(on_submit);
 
-        let text_input_padding = Padding::default()
-            .left(TIMER_SIZE * 2)
-            .right(TIMER_SIZE * 2);
-
         let column = column![
-            title_text,
+            widget::text(title_text).size(30),
             rich_text![
                 span(time_left.as_mins().to_string()).color(timer_color),
-                span(":"),
+                span(":").color(self.theme.extended_palette().background.strong.color),
                 span(format!("{:02}", time_left.as_secs().abs() % 60)).color(timer_color)
             ]
             .on_link_click(never)
             .size(TIMER_SIZE),
-            text_input.padding(text_input_padding),
+            "Enter the goal of your next work session",
+            text_input,
         ]
         .align_x(Horizontal::Center)
-        .spacing(20);
+        .max_width(TIMER_SIZE * 3.0);
 
         #[cfg(debug_assertions)]
         let column = column.push(
@@ -172,10 +156,6 @@ impl BreakTimer {
             .align_y(Vertical::Center)
             .width(Length::Fill)
             .height(Length::Fill);
-
-        if self.needs_startup_focus {
-            return sensor(container).on_show(|_| Message::StartupFocus).into();
-        }
 
         container.into()
     }

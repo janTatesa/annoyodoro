@@ -32,6 +32,6 @@ jiff = { version = "0.2.15", features = ["serde"] }
 notify-rust = "4.11.7"
 mpris = "2.0.1"
 lucide-icons = "0.575.0"
-iced_sessionlock = "0.15.0"
-hyozu = { git = "https://github.com/airstrike/hyozu", version = "0.1.0", branch = "0.14" }
 yanet = { git = "https://github.com/janTatesa/yanet", version = "0.1.0", features = ["colors"] }
+hyozu = { git = "https://github.com/airstrike/hyozu", branch = "0.14", version = "0.1.0" }
+iced_layershell = "0.15.1"
