@@ -86,7 +86,6 @@ impl BreakTimer {
 #[derive(Debug, Clone)]
 enum Message {
     ContinueWorking,
-    FocusTextInput,
     WorkGoalChange(String),
     Tick(Instant)
 }
@@ -115,7 +114,6 @@ impl BreakTimer {
             | Message::ExclusiveZoneChange(_)
             | Message::KeyboardInteractivityChange(_)
             | Message::VirtualKeyboardPressed { .. } => {}
-            Message::FocusTextInput => return focus("work-goal")
         }
 
         Task::none()
@@ -135,10 +133,9 @@ impl BreakTimer {
         let on_submit =
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
-        let text_input = sweeten::text_input("Work goal", &self.work_goal)
+        let text_input = widget::text_input("Work goal", &self.work_goal)
             .id("work-goal")
             .on_input(Message::WorkGoalChange)
-            .on_blur(Message::FocusTextInput)
             .on_submit_maybe(on_submit);
         let timer = stack![
             Circular {

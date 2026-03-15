@@ -81,7 +81,6 @@ enum AppState {
 enum Message {
     InitialWorkGoalChange(String),
     InitialWorkGoalSubmit,
-    FocusTextInput,
 
     TogglePause,
     ToggleLastWorkSession,
@@ -215,12 +214,8 @@ impl Annoyodoro {
                     last_work_session, ..
                 }
             ) => *last_work_session = !*last_work_session,
-            (Message::FocusTextInput, AppState::InitialWorkGoalPrompt { .. }) => {
-                return Ok(focus("worK-goal"))
-            }
             (Message::InitialWorkGoalChange(_), AppState::Running { .. }) => {}
             (Message::InitialWorkGoalSubmit, AppState::Running { .. }) => {}
-            (Message::FocusTextInput, AppState::Running { .. }) => {}
             (Message::TogglePause, AppState::InitialWorkGoalPrompt { .. }) => {}
             (Message::ToggleLastWorkSession, AppState::InitialWorkGoalPrompt { .. }) => {}
             (Message::Tick, AppState::InitialWorkGoalPrompt { .. }) => {}

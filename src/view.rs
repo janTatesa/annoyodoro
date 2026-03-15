@@ -126,9 +126,8 @@ impl Annoyodoro {
     }
 
     fn initial_work_goal_prompt<'a>(work_goal: &str) -> Element<'a, Message> {
-        let text_input = sweeten::text_input("Work goal", work_goal)
+        let text_input = widget::text_input("Work goal", work_goal)
             .id("work-goal")
-            .on_blur(Message::FocusTextInput)
             .on_input(Message::InitialWorkGoalChange)
             .on_submit(Message::InitialWorkGoalSubmit);
         let column = column!["Enter the goal of your fist work session", text_input]
