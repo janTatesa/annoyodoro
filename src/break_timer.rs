@@ -8,14 +8,15 @@ use iced::{
     Element, Length, Task, Theme,
     alignment::{Horizontal, Vertical},
     exit, never,
-    widget::{self, button, column, container, operation::focus, rich_text, span, text_input}
+    widget::{self, button, column, container, operation::focus, rich_text, span, stack},
+    window
 };
 use iced_layershell::{application, to_layer_message};
 use jiff::SignedDuration;
 use mpris::{PlaybackStatus, PlayerFinder};
 use yanet::Result;
 
-use crate::{TIMER_SIZE, config::Config};
+use crate::{circular::Circular, config::Config, view::TIMER_TEXT_SIZE};
 
 #[derive(Clone)]
 pub struct BreakTimer {
@@ -23,16 +24,20 @@ pub struct BreakTimer {
     last_tick: Instant,
     long_break: bool,
     break_duration_left: SignedDuration,
+    break_duration: SignedDuration,
     work_goal: String,
     theme: Theme
 }
 
 impl BreakTimer {
     pub fn spawn(long_break: bool, config: Config) -> Result<String> {
-        let player = PlayerFinder::new()?.find_active()?;
-        let was_playing_before_break = player.get_playback_status()? == PlaybackStatus::Playing;
-        if was_playing_before_break {
-            player.pause()?
+        let mut was_playing_before_break = false;
+        let player = PlayerFinder::new()?.find_active().ok();
+        if let Some(player) = &player
+            && player.get_playback_status()? == PlaybackStatus::Playing
+        {
+            was_playing_before_break = true;
+            player.pause()?;
         }
 
         let duration = if long_break {
@@ -48,25 +53,28 @@ impl BreakTimer {
             break_duration_left: duration.try_into()?,
             theme: config.theme(),
             work_goal_tx,
-            work_goal: String::new()
+            work_goal: String::new(),
+            break_duration: duration.try_into()?
         };
 
         application(
-            move || (timer.clone(), Task::none()),
+            move || (timer.clone(), focus("work-goal")),
             "annoyodoro",
             BreakTimer::update,
             BreakTimer::view
         )
         .default_font(config.font)
         .theme(|app: &BreakTimer| app.theme.clone())
-        .subscription(|_| iced::time::every(iced::time::Duration::from_secs(1)).map(Message::Tick))
+        .subscription(|_| window::frames().map(Message::Tick))
         .run()?;
 
         let work_goal = work_goal_rx
             .try_recv()
             .expect("Work goal should have been sent");
 
-        if was_playing_before_break {
+        if let Some(player) = player
+            && was_playing_before_break
+        {
             player.play()?
         }
 
@@ -78,6 +86,7 @@ impl BreakTimer {
 #[derive(Debug, Clone)]
 enum Message {
     ContinueWorking,
+    FocusTextInput,
     WorkGoalChange(String),
     Tick(Instant)
 }
@@ -106,9 +115,10 @@ impl BreakTimer {
             | Message::ExclusiveZoneChange(_)
             | Message::KeyboardInteractivityChange(_)
             | Message::VirtualKeyboardPressed { .. } => {}
+            Message::FocusTextInput => return focus("work-goal")
         }
 
-        focus("work-goal")
+        Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -125,25 +135,38 @@ impl BreakTimer {
         let on_submit =
             (!self.break_duration_left.is_positive()).then_some(Message::ContinueWorking);
 
-        let text_input = text_input("Work goal", &self.work_goal)
+        let text_input = sweeten::text_input("Work goal", &self.work_goal)
             .id("work-goal")
             .on_input(Message::WorkGoalChange)
+            .on_blur(Message::FocusTextInput)
             .on_submit_maybe(on_submit);
-
+        let timer = stack![
+            Circular {
+                percentage: 1.0
+                    - self.break_duration_left.as_millis_f32()
+                        / self.break_duration.as_millis_f32(),
+                color: timer_color,
+                theme: self.theme.clone()
+            },
+            container(
+                rich_text![
+                    span(time_left.as_mins().to_string()).color(timer_color),
+                    span(":").color(self.theme.extended_palette().background.strong.color),
+                    span(format!("{:02}", time_left.as_secs().abs() % 60)).color(timer_color)
+                ]
+                .on_link_click(never)
+                .size(TIMER_TEXT_SIZE)
+            )
+            .center(Length::Fill)
+        ];
         let column = column![
             widget::text(title_text).size(30),
-            rich_text![
-                span(time_left.as_mins().to_string()).color(timer_color),
-                span(":").color(self.theme.extended_palette().background.strong.color),
-                span(format!("{:02}", time_left.as_secs().abs() % 60)).color(timer_color)
-            ]
-            .on_link_click(never)
-            .size(TIMER_SIZE),
+            timer,
             "Enter the goal of your next work session",
             text_input,
         ]
         .align_x(Horizontal::Center)
-        .max_width(TIMER_SIZE * 3.0);
+        .max_width(TIMER_TEXT_SIZE * 3.0);
 
         #[cfg(debug_assertions)]
         let column = column.push(

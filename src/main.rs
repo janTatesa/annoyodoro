@@ -1,30 +1,28 @@
 #![cfg_attr(not(debug_assertions), allow(unused_imports))]
 
 mod break_timer;
+mod circular;
 mod cli;
 mod config;
 mod stats;
+mod view;
 mod work_timer;
 
-use std::{cell::RefCell, mem, time::Duration};
+use std::{cell::RefCell, mem};
 
 use break_timer::BreakTimer;
 use clap::Parser;
 use cli::Cli;
 use config::Config;
 use iced::{
-    Alignment, Element, Event, Font, Length, Subscription, Task,
-    event::{self, Status},
+    Event, Subscription, Task,
+    event::Status,
     exit,
-    keyboard::{self, Key, key::Named},
-    never,
-    widget::{
-        self, Container, button, column, container, operation::focus, rich_text, row, span, text
-    },
-    window::Id
+    keyboard::{self, Key},
+    widget::operation::focus,
+    window::{self, Id}
 };
-use jiff::SignedDuration;
-use lucide_icons::{Icon, LUCIDE_FONT_BYTES};
+use lucide_icons::LUCIDE_FONT_BYTES;
 use notify_rust::Notification;
 use stats::StatsManager;
 use work_timer::WorkTimer;
@@ -47,7 +45,7 @@ fn main() -> Result<()> {
     let theme = config.theme();
     let stats = StatsManager::load()?;
     let once_boot = RefCell::new(Some(Annoyodoro::new(config, stats)));
-    let boot = move || (once_boot.borrow_mut().take().unwrap(), Task::none());
+    let boot = move || (once_boot.borrow_mut().take().unwrap(), focus("work-goal"));
 
     iced::application(boot, Annoyodoro::update, Annoyodoro::view)
         .subscription(Annoyodoro::subscription)
@@ -83,6 +81,7 @@ enum AppState {
 enum Message {
     InitialWorkGoalChange(String),
     InitialWorkGoalSubmit,
+    FocusTextInput,
 
     TogglePause,
     ToggleLastWorkSession,
@@ -91,9 +90,6 @@ enum Message {
     #[cfg(debug_assertions)]
     DebugEarlyBreak
 }
-
-const SPACING: f32 = 5.0;
-const TIMER_SIZE: f32 = 120.0;
 
 impl Annoyodoro {
     fn new(config: Config, stats: StatsManager) -> Self {
@@ -219,14 +215,18 @@ impl Annoyodoro {
                     last_work_session, ..
                 }
             ) => *last_work_session = !*last_work_session,
+            (Message::FocusTextInput, AppState::InitialWorkGoalPrompt { .. }) => {
+                return Ok(focus("worK-goal"))
+            }
             (Message::InitialWorkGoalChange(_), AppState::Running { .. }) => {}
             (Message::InitialWorkGoalSubmit, AppState::Running { .. }) => {}
+            (Message::FocusTextInput, AppState::Running { .. }) => {}
             (Message::TogglePause, AppState::InitialWorkGoalPrompt { .. }) => {}
             (Message::ToggleLastWorkSession, AppState::InitialWorkGoalPrompt { .. }) => {}
             (Message::Tick, AppState::InitialWorkGoalPrompt { .. }) => {}
         }
 
-        Ok(focus("work-goal"))
+        Ok(Task::none())
     }
 
     fn key_subscription(event: Event, _: Status, _: Id) -> Option<Message> {
@@ -234,7 +234,6 @@ impl Annoyodoro {
             && modifiers.is_empty()
         {
             return match key {
-                Key::Named(Named::Escape) => todo!(),
                 Key::Character(char) if char == "p" => Some(Message::TogglePause),
                 Key::Character(char) if char == "l" => Some(Message::ToggleLastWorkSession),
                 _ => None
@@ -245,118 +244,9 @@ impl Annoyodoro {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        match &self.state {
-            AppState::InitialWorkGoalPrompt { .. } => Subscription::none(),
-            AppState::Running { work_timer, .. }
-                if !work_timer.is_paused() && !work_timer.duration_remaning().is_zero() =>
-            {
-                Subscription::batch([
-                    event::listen_with(Self::key_subscription),
-                    iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick)
-                ])
-            }
-            AppState::Running { .. } => event::listen_with(Self::key_subscription)
-        }
-    }
-
-    fn view(&self) -> Element<'_, Message> {
-        match self.state {
-            AppState::Running { work_timer, .. } if work_timer.duration_remaning().is_zero() => {
-                "If you're seeing this, the break timer didn't spawn and it's a bug".into()
-            }
-            AppState::Running {
-                long_break_in,
-                work_timer,
-                last_work_session,
-                ..
-            } => self.main_view(long_break_in, work_timer, last_work_session),
-            AppState::InitialWorkGoalPrompt { ref goal } => Self::initial_work_goal_prompt(goal)
-        }
-    }
-
-    fn main_view(
-        &self,
-        long_break_in: u16,
-        work_timer: WorkTimer,
-        last_work_session: bool
-    ) -> Element<'_, Message> {
-        let palette = self.config.theme().palette();
-        let time_left = work_timer
-            .duration_remaning()
-            .try_into()
-            .unwrap_or(SignedDuration::MAX);
-        let time_left = rich_text![
-            span(time_left.as_mins().to_string()).color(palette.primary),
-            span(":").color(
-                self.config
-                    .theme()
-                    .extended_palette()
-                    .background
-                    .strong
-                    .color
-            ),
-            span(format!("{:02}", time_left.as_secs().abs() % 60)).color(palette.primary)
-        ]
-        .on_link_click(never)
-        .size(TIMER_SIZE);
-        let toggle_pause_button = if work_timer.is_paused() {
-            button(widget::text(Icon::Play.unicode()).font(Font::with_name("lucide")))
-        } else {
-            button(widget::text(Icon::Pause.unicode()).font(Font::with_name("lucide")))
-        }
-        .on_press(Message::TogglePause);
-
-        let timer_row = row![time_left, toggle_pause_button]
-            .align_y(Alignment::Center)
-            .spacing(SPACING);
-
-        let column = column![
-            timer_row,
-            widget::checkbox(last_work_session)
-                .on_toggle(|_| Message::ToggleLastWorkSession)
-                .label("Last work session"),
-            row![
-                container("Next long break in").width(Length::Fill),
-                container(text(format!("{long_break_in} pomodori")).color(palette.primary))
-                    .align_right(Length::Fill)
-            ],
-            row![
-                container("Pomodori today").width(Length::Fill),
-                container(text(self.stats.pomodori_daily().to_string()).color(palette.primary))
-                    .align_right(Length::Fill)
-            ],
-            row![
-                "Current work goal",
-                container(self.stats.work_goals().last().unwrap().1.as_str())
-                    .align_right(Length::Fill)
-            ],
-            self.error
-                .as_ref()
-                .map(|e| widget::text(e).style(text::danger)),
-        ]
-        .max_width(TIMER_SIZE * 4.0)
-        .align_x(Alignment::Center);
-        #[cfg(debug_assertions)]
-        let column = column.push(
-            button("Early break (enabled only in debug mode)").on_press(Message::DebugEarlyBreak)
-        );
-
-        Container::new(column).center(Length::Fill).into()
-    }
-
-    fn initial_work_goal_prompt<'a>(work_goal: &str) -> Element<'a, Message> {
-        let text_input = widget::text_input("Work goal", work_goal)
-            .id("work-goal")
-            .on_input(Message::InitialWorkGoalChange)
-            .on_submit(Message::InitialWorkGoalSubmit);
-        let column = column![
-            container("Enter the goal of your fist work session").center(Length::Fill),
-            text_input
-        ]
-        .max_width(TIMER_SIZE * 3.0);
-        Container::new(column)
-            .padding(SPACING)
-            .center(Length::Fill)
-            .into()
+        Subscription::batch([
+            window::frames().map(|_| Message::Tick),
+            iced::event::listen_with(Self::key_subscription)
+        ])
     }
 }

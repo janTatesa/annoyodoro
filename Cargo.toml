@@ -26,6 +26,7 @@ iced = { version = "0.14", features = [
   "crisp",
   "wayland",
   "smol",
+  "advanced"
 ], default-features = false }
 smol = "2.0.2"
 jiff = { version = "0.2.15", features = ["serde"] }
@@ -35,3 +36,4 @@ lucide-icons = "0.575.0"
 yanet = { git = "https://github.com/janTatesa/yanet", version = "0.1.0", features = ["colors"] }
 hyozu = { git = "https://github.com/airstrike/hyozu", branch = "0.14", version = "0.1.0" }
 iced_layershell = "0.15.1"
+sweeten = { git = "https://github.com/airstrike/sweeten", branch = "0.14.0-dev", version = "0.14.0-dev" }
