@@ -1,5 +1,5 @@
 use iced::{
-    Alignment, Element, Font, Length, never, padding,
+    Alignment, Element, Font, Length, never,
     widget::{
         self, Container, button, column, container, rich_text, row, rule, span, stack,
         text::{self, Wrapping}
@@ -66,6 +66,11 @@ impl Annoyodoro {
                 .size(BIG_TEXT)
         )
         .on_press(Message::TogglePause);
+        let show_stats_button = button(
+            widget::text(Icon::ChartLine.unicode())
+                .font(Font::with_name("lucide"))
+                .size(BIG_TEXT)
+        );
 
         let timer = stack![
             Circular {
@@ -75,11 +80,12 @@ impl Annoyodoro {
                 color: palette.primary,
                 theme: self.config.theme()
             },
-            container(time_left).center(Length::Fill),
-            container(toggle_pause_button)
-                .align_right(Length::Fill)
-                .center_y(Length::Fill)
-                .padding(padding::right(SPACING * 5.0)),
+            container(
+                row![show_stats_button, time_left, toggle_pause_button]
+                    .spacing(SPACING)
+                    .align_y(Alignment::Center)
+            )
+            .center(Length::Fill)
         ];
         let column = column![
             widget::checkbox(last_work_session)

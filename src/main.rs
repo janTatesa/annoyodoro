@@ -49,6 +49,7 @@ fn main() -> Result<()> {
 
     iced::application(boot, Annoyodoro::update, Annoyodoro::view)
         .subscription(Annoyodoro::subscription)
+        .title(Annoyodoro::title)
         .default_font(default_font)
         .font(LUCIDE_FONT_BYTES)
         .theme(move |_: &Annoyodoro| theme.clone())
@@ -243,5 +244,17 @@ impl Annoyodoro {
             window::frames().map(|_| Message::Tick),
             iced::event::listen_with(Self::key_subscription)
         ])
+    }
+
+    fn title(&self) -> String {
+        match self.state {
+            AppState::InitialWorkGoalPrompt { .. } => "Annoyodoro".to_string(),
+            AppState::Running { work_timer, .. } => format!(
+                "Anoyodoro - {} - {}:{:02}",
+                self.stats.work_goals().last().unwrap().1,
+                work_timer.duration_remaning().as_secs() / 60,
+                work_timer.duration_remaning().as_secs() % 60,
+            )
+        }
     }
 }

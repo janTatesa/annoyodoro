@@ -6,6 +6,8 @@ use figment::{
 };
 use iced::{Color, Font, Theme, theme::Palette};
 use serde::{Deserialize, Deserializer, de::Error};
+#[cfg(not(debug_assertions))]
+use yanet::OptionExt;
 use yanet::Result;
 
 #[derive(Clone, Copy, Deserialize)]
@@ -86,7 +88,7 @@ impl Config {
 
     #[cfg(not(debug_assertions))]
     fn path() -> Result<PathBuf> {
-        let mut path_buf = dirs::config_dir().wrap_err("Cannot get config dir")?;
+        let mut path_buf = dirs::config_dir().ok_or_yanet("Cannot get config dir")?;
         path_buf.push("annoyodoro");
         fs::create_dir_all(&path_buf)?;
         path_buf.push("config.toml");

@@ -7,6 +7,8 @@ use jiff::{
     civil::{Date, DateTime}
 };
 use serde::{Deserialize, Serialize};
+#[cfg(not(debug_assertions))]
+use yanet::OptionExt;
 use yanet::{Result, ResultExt};
 
 pub struct StatsManager {
@@ -95,7 +97,7 @@ impl<K: From<Date> + Ord> CountMap<K> {
 impl StatsManager {
     #[cfg(not(debug_assertions))]
     fn path() -> Result<PathBuf> {
-        let mut path = dirs::data_dir().ok_or_eyre("Cannot determine data dir")?;
+        let mut path = dirs::data_dir().ok_or_yanet("Cannot determine data dir")?;
         path.push("annoyodoro");
         fs::create_dir_all(&path)?;
         path.push("stats.bin");
